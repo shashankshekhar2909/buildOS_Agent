@@ -1,7 +1,8 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import current_user, require_role
@@ -14,6 +15,18 @@ from app.skill_tasks import build_skill_task
 from app.skill_loader import sync_skill_catalog
 
 router = APIRouter(prefix="/v1/skills", tags=["skills"])
+
+
+async def _lookup_skill(db: AsyncSession, key: str):
+    """Resolve a skill by UUID id or by name."""
+    try:
+        uid = UUID(key)
+        row = (await db.execute(select(Skill).where(Skill.id == uid))).scalar_one_or_none()
+        if row:
+            return row
+    except ValueError:
+        pass
+    return (await db.execute(select(Skill).where(Skill.name == key))).scalar_one_or_none()
 
 
 @router.get("", response_model=list[SkillOut])
@@ -32,7 +45,7 @@ async def get_skill(
     db: Annotated[AsyncSession, Depends(get_db)],
     _user: Annotated[User, Depends(current_user)],
 ) -> SkillOut:
-    skill = (await db.execute(select(Skill).where(Skill.id == skill_id))).scalar_one_or_none()
+    skill = await _lookup_skill(db, skill_id)
     if not skill:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
     return SkillOut.model_validate(skill)
@@ -45,7 +58,7 @@ async def patch_skill(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(require_role("admin"))],
 ) -> SkillOut:
-    skill = (await db.execute(select(Skill).where(Skill.id == skill_id))).scalar_one_or_none()
+    skill = await _lookup_skill(db, skill_id)
     if not skill:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
     skill.enabled = body.enabled
@@ -100,11 +113,11 @@ async def update_skill(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(require_role("admin"))],
 ) -> SkillOut:
-    skill = (await db.execute(select(Skill).where(Skill.id == skill_id))).scalar_one_or_none()
+    skill = await _lookup_skill(db, skill_id)
     if not skill:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
     conflict = (
-        await db.execute(select(Skill).where(Skill.name == body.name, Skill.id != skill_id))
+        await db.execute(select(Skill).where(Skill.name == body.name, Skill.id != skill.id))
     ).scalar_one_or_none()
     if conflict:
         raise HTTPException(status.HTTP_409_CONFLICT, "skill name already exists")
@@ -132,7 +145,7 @@ async def delete_skill(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(require_role("admin"))],
 ) -> None:
-    skill = (await db.execute(select(Skill).where(Skill.id == skill_id))).scalar_one_or_none()
+    skill = await _lookup_skill(db, skill_id)
     if not skill:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
     await db.delete(skill)
@@ -147,7 +160,7 @@ async def run_skill(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(require_role("admin", "operator"))],
 ) -> TaskOut:
-    skill = (await db.execute(select(Skill).where(Skill.id == skill_id))).scalar_one_or_none()
+    skill = await _lookup_skill(db, skill_id)
     if not skill:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
     task = await build_skill_task(

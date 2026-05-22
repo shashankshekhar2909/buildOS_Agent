@@ -123,32 +123,35 @@ async def _invoke_skill(name: str, args: dict) -> dict:
     return await run_skill(name, args)
 
 
-async def run_agent(
+def resolve_skills(
     agent_name: str,
-    user_msg: str,
-    model: str = "claude-sonnet",
-    max_steps: int = 6,
     skill_overrides: list[str] | None = None,
     system_prompt: str | None = None,
     skill_names: list[str] | None = None,
-    approval_resolver=None,
-) -> RunResult:
+) -> tuple[str, list[str]]:
+    """Return (system_prompt, allowed_skills) for an agent."""
     preset = AGENT_PRESETS.get(agent_name)
-    if not preset and not system_prompt:
-        return RunResult(output="", stop_reason=f"unknown agent {agent_name}")
-
     available = list(skill_registry().keys())
     prompt = system_prompt or (preset["system_prompt"] if preset else "")
     base_skills = skill_names if skill_names is not None else (preset["skills"] if preset else None)
     allowed = skill_overrides or base_skills or available
     allowed = [s for s in allowed if s in available]
-    tools = _build_tools(allowed)
+    return prompt, allowed
 
-    messages: list[dict] = [{"role": "system", "content": prompt}]
-    messages.append({"role": "user", "content": user_msg})
 
+async def drive_loop(
+    messages: list[dict],
+    allowed_skills: list[str],
+    model: str = "claude-sonnet",
+    max_steps: int = 6,
+    trace: list[StepTrace] | None = None,
+    approval_resolver=None,
+) -> RunResult:
+    """Drive the LLM tool-loop from an existing message array. Used for both
+    fresh runs and resume-after-approval. Mutates `messages` in place."""
+    tools = _build_tools(allowed_skills)
     client = _llm_client()
-    trace: list[StepTrace] = []
+    trace = trace if trace is not None else []
 
     for _ in range(max_steps):
         kwargs: dict[str, Any] = {"model": model, "messages": messages}
@@ -215,3 +218,46 @@ async def run_agent(
             messages.append({"role": "tool", "tool_call_id": tc.id, "name": tname, "content": json.dumps(result, default=str)})
 
     return RunResult(output="", steps=trace, stop_reason="max_steps")
+
+
+async def resume_with_tool_result(
+    messages: list[dict],
+    tool_call_id: str,
+    tool_name: str,
+    result: dict,
+    allowed_skills: list[str],
+    model: str = "claude-sonnet",
+    max_steps: int = 6,
+    trace: list[StepTrace] | None = None,
+) -> RunResult:
+    """Inject a tool-result message for a previously-paused tool call,
+    then continue the loop."""
+    messages.append({
+        "role": "tool",
+        "tool_call_id": tool_call_id,
+        "name": tool_name,
+        "content": json.dumps(result, default=str),
+    })
+    return await drive_loop(messages, allowed_skills, model=model, max_steps=max_steps, trace=trace)
+
+
+async def run_agent(
+    agent_name: str,
+    user_msg: str,
+    model: str = "claude-sonnet",
+    max_steps: int = 6,
+    skill_overrides: list[str] | None = None,
+    system_prompt: str | None = None,
+    skill_names: list[str] | None = None,
+    approval_resolver=None,
+) -> RunResult:
+    """Legacy entry: build messages from scratch and drive the loop."""
+    preset = AGENT_PRESETS.get(agent_name)
+    if not preset and not system_prompt:
+        return RunResult(output="", stop_reason=f"unknown agent {agent_name}")
+    prompt, allowed = resolve_skills(agent_name, skill_overrides, system_prompt, skill_names)
+    messages: list[dict] = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": user_msg},
+    ]
+    return await drive_loop(messages, allowed, model=model, max_steps=max_steps, approval_resolver=approval_resolver)

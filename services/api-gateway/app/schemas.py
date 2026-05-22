@@ -94,6 +94,9 @@ class TaskOut(BaseModel):
 class ApprovalOut(BaseModel):
     id: UUID
     task_id: UUID | None
+    agent_run_id: UUID | None = None
+    tool: str | None = None
+    tool_call_id: str | None = None
     action: str
     risk: str
     payload: dict

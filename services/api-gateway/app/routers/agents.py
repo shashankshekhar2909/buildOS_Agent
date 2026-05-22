@@ -7,11 +7,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent_runtime import run_agent
+from app.agent_runtime import StepTrace, drive_loop, resolve_skills
 from app.agent_catalog import sync_agent_catalog
 from app.auth.deps import current_user, require_role
 from app.db import get_db
-from app.models import Agent, AuditLog, User
+from app.models import Agent, AgentRun, AgentRunState, Approval, ApprovalState, AuditLog, User
 
 router = APIRouter(prefix="/v1/agents", tags=["agents"])
 
@@ -164,6 +164,18 @@ async def delete_agent(
     await db.commit()
 
 
+def _state_from_stop(stop_reason: str) -> AgentRunState:
+    if stop_reason == "completed":
+        return AgentRunState.completed
+    if stop_reason == "approval_required":
+        return AgentRunState.waiting_approval
+    if stop_reason.startswith("unknown agent"):
+        return AgentRunState.failed
+    if stop_reason == "max_steps":
+        return AgentRunState.failed
+    return AgentRunState.failed
+
+
 @router.post("/{name}/run")
 async def run_(
     name: str,
@@ -176,32 +188,79 @@ async def run_(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "agent not found")
     if not agent.enabled:
         raise HTTPException(status.HTTP_409_CONFLICT, "agent disabled")
+
+    prompt, allowed = resolve_skills(
+        agent.name,
+        skill_overrides=body.skill_overrides,
+        system_prompt=agent.system_prompt,
+        skill_names=list(agent.skills or []),
+    )
+    messages: list[dict] = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": body.message},
+    ]
+    trace: list[StepTrace] = []
+
+    run = AgentRun(
+        agent_name=agent.name,
+        user_id=user.id,
+        model=body.model,
+        initial_message=body.message,
+        state=AgentRunState.running,
+        messages=messages,
+        steps=[],
+        skills=allowed,
+        max_steps=body.max_steps,
+    )
+    db.add(run)
+    await db.flush()
+
     try:
-        result = await run_agent(
-            agent.name,
-            body.message,
-            model=body.model,
-            max_steps=body.max_steps,
-            skill_overrides=body.skill_overrides or list(agent.skills or []),
-            system_prompt=agent.system_prompt,
-            skill_names=list(agent.skills or []),
-        )
+        result = await drive_loop(messages, allowed, model=body.model, max_steps=body.max_steps, trace=trace)
     except Exception as exc:
+        run.state = AgentRunState.failed
+        run.stop_reason = "exception"
+        run.error = str(exc)[:2000]
+        run.messages = messages
+        run.steps = [{"tool": s.tool, "arguments": s.arguments, "result": s.result, "error": s.error} for s in trace]
         db.add(AuditLog(
             actor_id=user.id,
             action=f"agent.run_failed:{agent.name}",
-            target_kind="agent",
-            target_id=agent.name,
+            target_kind="agent_run",
+            target_id=str(run.id),
             metadata_json={"error": str(exc)[:500]},
         ))
         await db.commit()
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"agent run failed: {exc}")
+
+    run.state = _state_from_stop(result.stop_reason)
+    run.stop_reason = result.stop_reason
+    run.messages = messages
+    run.steps = [{"tool": s.tool, "arguments": s.arguments, "result": s.result, "error": s.error} for s in trace]
+    run.pending_tool = result.pending_tool
+    run.output = result.output or None
+
+    if result.stop_reason == "approval_required" and result.pending_tool:
+        pt = result.pending_tool
+        db.add(Approval(
+            agent_run_id=run.id,
+            tool_call_id=pt.get("tool_call_id"),
+            tool=pt.get("tool"),
+            action=f"agent.tool:{pt.get('skill')}",
+            risk="high",
+            payload={"agent_run_id": str(run.id), "skill": pt.get("skill"), "arguments": pt.get("arguments")},
+        ))
+
     db.add(AuditLog(
         actor_id=user.id,
         action=f"agent.run:{agent.name}",
-        target_kind="agent",
-        target_id=agent.name,
+        target_kind="agent_run",
+        target_id=str(run.id),
         metadata_json={"stop_reason": result.stop_reason, "steps": len(result.steps)},
     ))
     await db.commit()
-    return result.to_dict()
+    await db.refresh(run)
+    payload = result.to_dict()
+    payload["run_id"] = str(run.id)
+    payload["state"] = run.state.value
+    return payload

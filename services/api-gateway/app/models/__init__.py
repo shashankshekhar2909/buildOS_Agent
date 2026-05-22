@@ -1,6 +1,7 @@
 from app.models.user import User
 from app.models.node import Node
 from app.models.agent import Agent
+from app.models.agent_run import AgentRun, AgentRunState
 from app.models.task import Task, TaskState
 from app.models.audit import AuditLog
 from app.models.approval import Approval, ApprovalState
@@ -12,6 +13,8 @@ __all__ = [
     "User",
     "Node",
     "Agent",
+    "AgentRun",
+    "AgentRunState",
     "Task",
     "TaskState",
     "AuditLog",
