@@ -108,7 +108,8 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] /memory UI rewrite: store form + semantic search + recent feed — 2026-05-23
 
 ## P6 — Mobile + Desktop
-- [ ] apps/mobile (Expo)
+- [x] apps/mobile (Expo Router) — login, runs, approvals, agents tabs — 2026-05-23
+- [ ] apps/mobile: WS live updates + run detail screen + push notifications
 - [ ] apps/desktop (Tauri)
 
 ## Shared Packages

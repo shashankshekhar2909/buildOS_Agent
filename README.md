@@ -120,7 +120,8 @@ open http://localhost:3300            # login: admin@example.com / password123
 | **Tests**          | done   | pytest integration harness · 27 tests · `make test`                          |
 | **Tailscale prod** | done   | `docker-compose.prod.yml` overlay binds API/Web to `$TAILSCALE_IP` only      |
 | **CI**             | done   | GitHub Actions runs pytest suite on push                                     |
-| **Mobile/Desktop** | todo   | Expo + Tauri (P6)                                                            |
+| **Mobile**         | scaffold | Expo Router · login + runs + approvals + agents tabs (`apps/mobile/`)      |
+| **Desktop**        | todo   | Tauri (P6)                                                                   |
 
 ---
 
@@ -264,7 +265,7 @@ P2  Node Runtime                                                  ████�
 P3  Agent Runtime + tool loop + resume                            ████████████ done
 P4  Skills (10 real handlers)                                     ████████████ done
 P5  Memory (pgvector + embeddings)                                ████████████ done
-P6  Mobile (Expo) + Desktop (Tauri)                               ▒▒▒▒▒▒▒▒▒▒▒▒ todo
+P6  Mobile (Expo) + Desktop (Tauri)                               ██████▒▒▒▒▒▒ wip
 ```
 
 Tracked in [`CHECKLIST.md`](./CHECKLIST.md). Strategy in [`PLAN.md`](./PLAN.md).

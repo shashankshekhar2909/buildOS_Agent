@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "BuildAgent",
+    "slug": "buildagent-mobile",
+    "version": "0.0.1",
+    "scheme": "buildagent",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.buildagent.mobile"
+    },
+    "android": {
+      "package": "io.buildagent.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#06070a"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "router": {},
+      "apiUrl": "http://100.64.108.107:8800"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
