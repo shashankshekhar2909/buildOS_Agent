@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, Box, Cpu, FileClock, Brain, Settings, Workflow, Wrench, ShieldCheck, MessageSquare } from "lucide-react";
+import { Activity, Box, Cpu, FileClock, Brain, Settings, Workflow, Wrench, ShieldCheck, MessageSquare, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ const items = [
   { href: "/", label: "Overview", icon: Activity },
   { href: "/nodes", label: "Nodes", icon: Cpu },
   { href: "/agents", label: "Agents", icon: Workflow },
+  { href: "/agent-runs", label: "Runs", icon: History },
   { href: "/skills", label: "Skills", icon: Wrench },
   { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/tasks", label: "Tasks", icon: Box },

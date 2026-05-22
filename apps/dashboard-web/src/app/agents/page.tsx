@@ -18,6 +18,8 @@ type Agent = {
   source: string;
 };
 type RunResult = {
+  run_id?: string;
+  state?: string;
   output: string;
   stop_reason: string;
   pending_tool: { tool: string; skill: string; arguments: Record<string, unknown> } | null;
@@ -304,6 +306,9 @@ export default function AgentsPage() {
                 <CardDescription>
                   stop_reason: <span className="font-mono text-white">{result.stop_reason}</span>
                   {result.pending_tool && <span className="ml-2 text-amber-300">pending: {result.pending_tool.tool}</span>}
+                  {result.run_id && (
+                    <a href={`/agent-runs/${result.run_id}`} className="ml-3 text-indigo-300 hover:text-indigo-200">open run →</a>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
