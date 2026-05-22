@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.db import Base, engine  # noqa: F401
-from app.routers import approvals, audit, auth, nodes, secrets as secrets_router, tasks
+from app.routers import approvals, audit, auth, grants, nodes, secrets as secrets_router, tasks
 from app.ws import client as ws_client, node as ws_node
 
 settings = get_settings()
@@ -32,6 +32,7 @@ app.include_router(tasks.router)
 app.include_router(approvals.router)
 app.include_router(audit.router)
 app.include_router(secrets_router.router)
+app.include_router(grants.router)
 app.include_router(ws_node.router)
 app.include_router(ws_client.router)
 

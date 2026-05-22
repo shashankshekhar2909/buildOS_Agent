@@ -7,7 +7,7 @@ from app.auth.deps import current_user, require_role
 from app.db import get_db
 from app.dispatcher import dispatch
 from app.events import publish
-from app.models import Approval, ApprovalState, AuditLog, Task, TaskState, User
+from app.models import Approval, ApprovalState, AuditLog, SkillGrant, Task, TaskState, User
 from app.schemas import TaskIn, TaskOut
 
 router = APIRouter(prefix="/v1/tasks", tags=["tasks"])
@@ -31,6 +31,17 @@ async def create_task(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(require_role("admin", "operator"))],
 ) -> TaskOut:
+    # Admins bypass skill grants; everyone else needs an explicit grant per skill name.
+    if body.kind == "skill" and user.role != "admin":
+        skill_name = body.payload.get("name") if isinstance(body.payload, dict) else None
+        if not skill_name:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "skill task requires payload.name")
+        granted = (await db.execute(
+            select(SkillGrant).where(SkillGrant.user_id == user.id, SkillGrant.skill_name == skill_name)
+        )).scalar_one_or_none()
+        if not granted:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"no grant for skill '{skill_name}'")
+
     needs_approval = body.kind in APPROVAL_REQUIRED_KINDS
     task = Task(
         title=body.title,

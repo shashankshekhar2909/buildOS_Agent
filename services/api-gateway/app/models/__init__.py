@@ -5,6 +5,7 @@ from app.models.audit import AuditLog
 from app.models.approval import Approval, ApprovalState
 from app.models.skill import Skill
 from app.models.secret import Secret
+from app.models.grant import SkillGrant
 
 __all__ = [
     "User",
@@ -16,4 +17,5 @@ __all__ = [
     "ApprovalState",
     "Skill",
     "Secret",
+    "SkillGrant",
 ]

@@ -1,21 +1,30 @@
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Literal
+
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.config import get_settings
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _settings = get_settings()
+# bcrypt limits inputs to 72 bytes — truncate at the boundary so callers never crash on long passwords.
+_MAX_PW_BYTES = 72
+
+
+def _clip(pw: str) -> bytes:
+    return pw.encode("utf-8")[:_MAX_PW_BYTES]
 
 
 def hash_password(pw: str) -> str:
-    return _pwd.hash(pw)
+    return bcrypt.hashpw(_clip(pw), bcrypt.gensalt()).decode()
 
 
 def verify_password(pw: str, hashed: str) -> bool:
-    return _pwd.verify(pw, hashed)
+    try:
+        return bcrypt.checkpw(_clip(pw), hashed.encode())
+    except ValueError:
+        return False
 
 
 def _encode(sub: str, ttl: timedelta, kind: Literal["access", "refresh"], extra: dict | None = None) -> str:
