@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import require_role
 from app.db import get_db
+from app.dispatcher import dispatch
 from app.events import publish
 from app.models import Approval, ApprovalState, AuditLog, Task, TaskState, User
 from app.schemas import ApprovalDecision, ApprovalOut
@@ -57,4 +58,8 @@ async def decide(
     ))
     await db.commit()
     await publish("approval.decided", {"id": approval_id, "approve": body.approve, "task_id": str(appr.task_id) if appr.task_id else None})
+    if body.approve and appr.task_id:
+        task = (await db.execute(select(Task).where(Task.id == appr.task_id))).scalar_one_or_none()
+        if task:
+            await dispatch(db, task)
     return ApprovalOut.model_validate(appr)

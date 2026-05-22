@@ -17,7 +17,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] `README.md` — 2026-05-23
 - [x] `PLAN.md` + `CHECKLIST.md` — 2026-05-23
 - [x] root `Makefile` — 2026-05-23
-- [ ] `git init` + first commit
+- [x] `git init` + first commit — 2026-05-23
 
 ### Infra (docker compose)
 - [x] postgres (host 5532 → 5432) — 2026-05-23
@@ -42,7 +42,8 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] healthz/readyz — 2026-05-23
 - [x] Dockerfile — 2026-05-23
 - [x] dev-mode auto create_all (alembic later) — 2026-05-23
-- [ ] alembic init + first migration
+- [x] alembic env.py + script.py.mako + alembic.ini — 2026-05-23 (run `make revision m=init` once postgres is up to autogen)
+- [x] dispatcher: command tasks → node WS, persist task.result/started — 2026-05-23
 - [ ] tests
 
 ### Dashboard (apps/dashboard-web)
@@ -55,8 +56,9 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] api client + WS hook + token storage — 2026-05-23
 - [x] Dockerfile (standalone output) — 2026-05-23
 - [ ] shadcn/ui init (needs `npx shadcn init` once node deps install)
-- [ ] approvals UI
-- [ ] tasks UI
+- [x] approvals UI w/ approve/deny — 2026-05-23
+- [x] tasks UI w/ create form, state pills, cancel — 2026-05-23
+- [x] WS bridge invalidates queries on node./task./approval. events — 2026-05-23
 
 ## P2 — Node Runtime
 - [x] pyproject.toml — 2026-05-23
@@ -72,7 +74,8 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] base Agent + Tool dataclasses — 2026-05-23
 - [x] CoreAgent + Infra/Mail/Research/Dev/Notes — 2026-05-23
 - [x] task_engine skeleton — 2026-05-23
-- [ ] real task engine (poll/dispatch/retry/deps)
+- [x] inline dispatcher for command tasks (queued → node WS exec) — 2026-05-23
+- [ ] standalone agent-runtime worker (poll/dispatch/retry/deps for skill/agent/workflow kinds)
 - [ ] tool-calling loop
 - [ ] approval handshake from agent path
 
@@ -108,7 +111,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] approval workflow on shell exec / deploy / delete / restart / send_email — 2026-05-23
 - [x] per-node registration token (hashed) + global NODE_TOKEN fallback — 2026-05-23
 - [x] INTERNAL_SERVICE_TOKEN header for service-to-service — 2026-05-23
-- [ ] secrets encrypted at rest (fernet)
+- [x] secrets encrypted at rest (fernet) + /v1/secrets endpoint — 2026-05-23
+- [x] refresh token rotation (jti+family, redis-backed, reuse detection revokes family) — 2026-05-23
 - [ ] per-skill permission scopes enforced
 - [ ] Tailscale-only bind in prod compose override
-- [ ] refresh token rotation + reuse detection

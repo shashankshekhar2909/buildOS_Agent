@@ -15,6 +15,8 @@ COPY services/api-gateway/pyproject.toml ./pyproject.toml
 RUN pip install --upgrade pip && pip install -e .
 
 COPY services/api-gateway/app ./app
+COPY services/api-gateway/alembic ./alembic
+COPY services/api-gateway/alembic.ini ./alembic.ini
 
 EXPOSE 8000
 

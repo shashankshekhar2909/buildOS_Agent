@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import current_user, require_role
 from app.db import get_db
+from app.dispatcher import dispatch
 from app.events import publish
 from app.models import Approval, ApprovalState, AuditLog, Task, TaskState, User
 from app.schemas import TaskIn, TaskOut
@@ -48,6 +49,8 @@ async def create_task(
     await db.commit()
     await db.refresh(task)
     await publish("task.created", {"id": str(task.id), "kind": task.kind, "state": task.state.value})
+    if task.state == TaskState.queued:
+        await dispatch(db, task)
     return TaskOut.model_validate(task)
 
 

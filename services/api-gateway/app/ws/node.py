@@ -7,7 +7,7 @@ from app.auth.jwt import verify_password
 from app.config import get_settings
 from app.db import SessionLocal
 from app.events import publish
-from app.models import Node
+from app.models import Node, Task, TaskState
 from app.ws.manager import manager
 
 router = APIRouter()
@@ -52,7 +52,29 @@ async def node_socket(ws: WebSocket, token: str = Query(...), node_id: str = Que
                         n.last_seen = datetime.now(tz=timezone.utc)
                         await db.commit()
                 await manager.broadcast_clients({"event": "node.heartbeat", "data": {"id": node_id, "metrics": msg.get("metrics", {})}})
-            elif kind in ("task.result", "task.log", "task.started"):
+            elif kind == "task.started":
+                data = msg.get("data", {})
+                async with SessionLocal() as db:
+                    t = (await db.execute(select(Task).where(Task.id == data.get("task_id")))).scalar_one_or_none()
+                    if t and t.state != TaskState.running:
+                        t.state = TaskState.running
+                        t.started_at = datetime.now(tz=timezone.utc)
+                        await db.commit()
+                await manager.broadcast_clients({"event": kind, "data": data})
+                await publish(kind, data)
+            elif kind == "task.result":
+                data = msg.get("data", {})
+                async with SessionLocal() as db:
+                    t = (await db.execute(select(Task).where(Task.id == data.get("task_id")))).scalar_one_or_none()
+                    if t:
+                        t.state = TaskState.completed if data.get("ok") else TaskState.failed
+                        t.result = data
+                        t.error = None if data.get("ok") else (data.get("error") or data.get("stderr") or "failed")
+                        t.finished_at = datetime.now(tz=timezone.utc)
+                        await db.commit()
+                await manager.broadcast_clients({"event": kind, "data": data})
+                await publish(kind, data)
+            elif kind == "task.log":
                 await manager.broadcast_clients({"event": kind, "data": msg.get("data", {})})
                 await publish(kind, msg.get("data", {}))
     except WebSocketDisconnect:

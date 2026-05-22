@@ -3,8 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.db import Base, engine
-from app.routers import approvals, audit, auth, nodes, tasks
+from app.db import Base, engine  # noqa: F401
+from app.routers import approvals, audit, auth, nodes, secrets as secrets_router, tasks
 from app.ws import client as ws_client, node as ws_node
 
 settings = get_settings()
@@ -12,9 +12,7 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Dev convenience: create tables if missing. Alembic owns prod migrations.
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Schema owned by alembic — run `make migrate` before first boot.
     yield
 
 
@@ -33,6 +31,7 @@ app.include_router(nodes.router)
 app.include_router(tasks.router)
 app.include_router(approvals.router)
 app.include_router(audit.router)
+app.include_router(secrets_router.router)
 app.include_router(ws_node.router)
 app.include_router(ws_client.router)
 

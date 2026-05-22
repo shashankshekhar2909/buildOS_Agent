@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 from jose import JWTError, jwt
@@ -27,8 +28,17 @@ def make_access_token(sub: str, role: str) -> str:
     return _encode(sub, timedelta(minutes=_settings.jwt_access_ttl_min), "access", {"role": role})
 
 
-def make_refresh_token(sub: str) -> str:
-    return _encode(sub, timedelta(days=_settings.jwt_refresh_ttl_days), "refresh")
+def make_refresh_token(sub: str, family: str | None = None) -> tuple[str, str, str]:
+    """Returns (token, jti, family). family ties rotation; jti is single-use."""
+    jti = secrets.token_urlsafe(16)
+    fam = family or secrets.token_urlsafe(16)
+    token = _encode(
+        sub,
+        timedelta(days=_settings.jwt_refresh_ttl_days),
+        "refresh",
+        {"jti": jti, "family": fam},
+    )
+    return token, jti, fam
 
 
 def decode_token(token: str) -> dict:

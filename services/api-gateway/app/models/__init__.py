@@ -4,6 +4,7 @@ from app.models.task import Task, TaskState
 from app.models.audit import AuditLog
 from app.models.approval import Approval, ApprovalState
 from app.models.skill import Skill
+from app.models.secret import Secret
 
 __all__ = [
     "User",
@@ -14,4 +15,5 @@ __all__ = [
     "Approval",
     "ApprovalState",
     "Skill",
+    "Secret",
 ]
