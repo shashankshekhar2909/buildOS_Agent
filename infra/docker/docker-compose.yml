@@ -1,0 +1,118 @@
+name: buildagent
+
+# All services run on a private docker network. Host ports chosen to avoid
+# collision with services already running on this machine at scaffold time.
+# Internal port = service framework default. Host port = remapped to free port.
+
+x-common-env: &common-env
+  DATABASE_URL: ${DATABASE_URL}
+  REDIS_URL: ${REDIS_URL}
+  JWT_SECRET: ${JWT_SECRET}
+  JWT_ALG: ${JWT_ALG:-HS256}
+  JWT_ACCESS_TTL_MIN: ${JWT_ACCESS_TTL_MIN:-15}
+  JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-30}
+  NODE_TOKEN: ${NODE_TOKEN}
+  INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+  LITELLM_URL: ${LITELLM_URL:-http://litellm:4000}
+  LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3300}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-buildagent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-buildagent}
+      POSTGRES_DB: ${POSTGRES_DB:-buildagent}
+    ports:
+      - "${HOST_POSTGRES_PORT:-5532}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-buildagent}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [bnet]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${HOST_REDIS_PORT:-6479}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [bnet]
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    restart: unless-stopped
+    ports:
+      - "${HOST_LITELLM_PORT:-4400}:4000"
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-buildagent-master}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    volumes:
+      - ./litellm.config.yaml:/app/config.yaml:ro
+    networks: [bnet]
+
+  typesense:
+    image: typesense/typesense:0.25.2
+    restart: unless-stopped
+    ports:
+      - "${HOST_TYPESENSE_PORT:-8208}:8108"
+    environment:
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-buildagent-typesense}
+      TYPESENSE_DATA_DIR: /data
+    volumes:
+      - typesensedata:/data
+    networks: [bnet]
+
+  api-gateway:
+    build:
+      context: ../..
+      dockerfile: services/api-gateway/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+    ports:
+      - "${HOST_API_PORT:-8800}:8000"
+    networks: [bnet]
+
+  dashboard-web:
+    build:
+      context: ../..
+      dockerfile: apps/dashboard-web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api-gateway
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8800}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8800/ws}
+    ports:
+      - "${HOST_WEB_PORT:-3300}:3000"
+    networks: [bnet]
+
+volumes:
+  pgdata:
+  redisdata:
+  typesensedata:
+
+networks:
+  bnet:
+    driver: bridge
