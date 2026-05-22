@@ -118,7 +118,8 @@ open http://localhost:3300            # login: admin@example.com / password123
 | **Connectors**     | done   | Telegram + Slack bot token wizards, validated against bot API on save        |
 | **Memory (P5)**    | done   | pgvector · embeddings via LiteLLM · /v1/memory CRUD+search · memory skill    |
 | **Tests**          | done   | pytest integration harness · 27 tests · `make test`                          |
-| **Tailscale prod** | todo   | Compose override binding API + WS to tailnet only                            |
+| **Tailscale prod** | done   | `docker-compose.prod.yml` overlay binds API/Web to `$TAILSCALE_IP` only      |
+| **CI**             | done   | GitHub Actions runs pytest suite on push                                     |
 | **Mobile/Desktop** | todo   | Expo + Tauri (P6)                                                            |
 
 ---
@@ -196,6 +197,25 @@ infra/
   docker/         compose + litellm.config.yaml
   scripts/        smoke.sh, bootstrap.sh
 ```
+
+---
+
+## Prod deploy (tailnet-only)
+
+```bash
+export TAILSCALE_IP=100.x.y.z       # this host's tailnet IP
+docker compose \
+  -f infra/docker/docker-compose.yml \
+  -f infra/docker/docker-compose.prod.yml \
+  --env-file .env up -d
+```
+
+Effects:
+- Postgres / Redis / LiteLLM / Typesense lose host port mappings entirely (internal docker network only).
+- API + dashboard bind to `$TAILSCALE_IP` only — public-internet curls get refused at the kernel.
+- API switches to multi-worker uvicorn, no `--reload`.
+
+Set `CORS_ORIGINS` in `.env` to your tailnet origin before bringing this up.
 
 ---
 

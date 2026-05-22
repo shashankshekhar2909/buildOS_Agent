@@ -1,0 +1,81 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate CI .env
+        run: |
+          cp .env.example .env
+          # Override prod-placeholder values with CI-safe ones.
+          sed -i 's|^JWT_SECRET=.*|JWT_SECRET=ci-jwt-secret-32-chars-minimum-okay|' .env
+          sed -i 's|^NODE_TOKEN=.*|NODE_TOKEN=ci-node-token|' .env
+          sed -i 's|^INTERNAL_SERVICE_TOKEN=.*|INTERNAL_SERVICE_TOKEN=ci-internal-token|' .env
+          FERNET=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" 2>/dev/null || \
+                   python -c "import secrets,base64;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())")
+          sed -i "s|^FERNET_KEY=.*|FERNET_KEY=${FERNET}|" .env
+          echo "CORS_ORIGINS=http://127.0.0.1:3300" >> .env
+          cat .env | grep -E '^(JWT_SECRET|FERNET_KEY|NODE_TOKEN|INTERNAL_SERVICE_TOKEN)='
+
+      - name: Install cryptography for Fernet keygen
+        run: python -m pip install -q cryptography
+
+      - name: Re-generate FERNET_KEY using cryptography
+        run: |
+          FERNET=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+          sed -i "s|^FERNET_KEY=.*|FERNET_KEY=${FERNET}|" .env
+
+      - name: Boot stack (postgres, redis, api-gateway)
+        run: |
+          docker compose \
+            -f infra/docker/docker-compose.yml \
+            --env-file .env \
+            up -d --build postgres redis api-gateway
+          # Wait for healthz
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8800/healthz >/dev/null 2>&1; then
+              echo "api up"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Migrate
+        run: docker exec buildagent-api-gateway-1 alembic upgrade head
+
+      - name: Restart api-gateway (load new schema)
+        run: docker restart buildagent-api-gateway-1 && sleep 5 && curl -fsS http://127.0.0.1:8800/healthz
+
+      - name: Install test deps
+        run: python -m pip install -q -r tests/requirements.txt
+
+      - name: Run pytest
+        env:
+          BUILDAGENT_API_URL: http://127.0.0.1:8800
+          BOOTSTRAP_ADMIN_EMAIL: admin@example.com
+          BOOTSTRAP_ADMIN_PASSWORD: password123
+        run: PYTHONPATH=. python -m pytest tests -c tests/pytest.ini
+
+      - name: Dump api logs on failure
+        if: failure()
+        run: docker logs buildagent-api-gateway-1 --tail 200
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose -f infra/docker/docker-compose.yml --env-file .env down -v

@@ -1,0 +1,39 @@
+# Production override.
+#
+# Usage:
+#   export TAILSCALE_IP=100.64.108.107
+#   docker compose \
+#       -f infra/docker/docker-compose.yml \
+#       -f infra/docker/docker-compose.prod.yml \
+#       --env-file .env up -d
+#
+# Effect:
+#   - postgres/redis/litellm/typesense get NO host port mapping (internal only).
+#   - api-gateway + dashboard-web bind ONLY to TAILSCALE_IP, not 0.0.0.0.
+#   - api-gateway runs multi-worker uvicorn (no --reload).
+#
+# Set CORS_ORIGINS in .env to your tailnet origin before bringing this up.
+
+services:
+  postgres:
+    ports: !override []
+
+  redis:
+    ports: !override []
+
+  litellm:
+    ports: !override []
+
+  typesense:
+    ports: !override []
+
+  api-gateway:
+    ports: !override
+      - "${TAILSCALE_IP:-127.0.0.1}:${HOST_API_PORT:-8800}:8000"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+    restart: always
+
+  dashboard-web:
+    ports: !override
+      - "${TAILSCALE_IP:-127.0.0.1}:${HOST_WEB_PORT:-3300}:3000"
+    restart: always

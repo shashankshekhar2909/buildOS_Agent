@@ -129,4 +129,5 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] refresh token rotation (jti+family, redis-backed, reuse detection revokes family) — 2026-05-23
 - [x] per-skill permission scopes enforced (SkillGrant table + /v1/grants + tasks router gate) — 2026-05-23
 - [x] live smoke test end-to-end pass (register → node → command → approval → dispatch → failed:node-offline) — 2026-05-23
-- [ ] Tailscale-only bind in prod compose override
+- [x] Tailscale-only bind in prod compose override (infra/docker/docker-compose.prod.yml) — 2026-05-23
+- [x] GitHub Actions CI workflow running pytest suite on push — 2026-05-23
