@@ -37,12 +37,16 @@ Or scan the QR code with Expo Go.
 ## What's wired
 
 - JWT login + automatic refresh-on-401 retry (`src/api.ts`)
-- React Query polling every 8s
+- WebSocket bridge (`src/ws.ts`) — invalidates React Query caches on
+  `agent_run.*` / `approval.*` / `task.*` events. Auto-reconnect.
+- React Query polling 30s as safety net (WS is primary refresh signal)
 - Route guard auto-redirects unauth -> `/login`, auth -> `/runs`
+- Run detail screen `/run/[id]` — step trace + inline approve/deny when
+  the run is paused on an approval
 
 ## What's not (yet)
 
-- WebSocket live updates (mobile bridge TBD)
-- Agent-run detail screen with step inspector
-- Push notifications on approval-needed
+- Push notifications on approval-needed (expo-notifications + backend
+  device-token registration)
 - Connector setup (Telegram/Slack token entry)
+- Memory tab

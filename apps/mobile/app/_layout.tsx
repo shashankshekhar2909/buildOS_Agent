@@ -3,15 +3,17 @@ import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { useSession } from "@/src/session";
+import { useEventBridge } from "@/src/ws";
 
 const qc = new QueryClient({
-  defaultOptions: { queries: { staleTime: 5_000, refetchInterval: 8_000 } },
+  defaultOptions: { queries: { staleTime: 5_000, refetchInterval: 30_000 } },
 });
 
 function Guard() {
   const session = useSession();
   const segments = useSegments();
   const router = useRouter();
+  useEventBridge(session.token);
 
   useEffect(() => {
     if (!session.ready) return;

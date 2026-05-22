@@ -1,4 +1,5 @@
-import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/src/api";
 
@@ -22,6 +23,7 @@ const STATE_COLOR: Record<string, string> = {
 };
 
 export default function Runs() {
+  const router = useRouter();
   const q = useQuery<Run[]>({ queryKey: ["agent-runs"], queryFn: () => api<Run[]>("/v1/agent-runs") });
   const runs = q.data ?? [];
 
@@ -33,7 +35,10 @@ export default function Runs() {
         refreshControl={<RefreshControl refreshing={q.isFetching} onRefresh={() => q.refetch()} tintColor="#7c5cff" />}
         ListEmptyComponent={<Text style={styles.empty}>No runs yet. Trigger one from Agents tab.</Text>}
         renderItem={({ item }) => (
-          <View style={styles.row}>
+          <Pressable
+            style={({ pressed }) => [styles.row, pressed && { backgroundColor: "#0a0a0a" }]}
+            onPress={() => router.push(`/run/${item.id}`)}
+          >
             <View style={[styles.pill, { backgroundColor: STATE_COLOR[item.state] || "#333" }]}>
               <Text style={styles.pillText}>{item.state}</Text>
             </View>
@@ -43,7 +48,7 @@ export default function Runs() {
                 {item.agent_name} · {item.model} · {item.steps?.length ?? 0} steps · {new Date(item.created_at).toLocaleTimeString()}
               </Text>
             </View>
-          </View>
+          </Pressable>
         )}
       />
     </View>
