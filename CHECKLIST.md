@@ -110,7 +110,8 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 ## P6 — Mobile + Desktop
 - [x] apps/mobile (Expo Router) — login, runs, approvals, agents tabs — 2026-05-23
 - [ ] apps/mobile: WS live updates + run detail screen + push notifications
-- [ ] apps/desktop (Tauri)
+- [x] apps/desktop (Tauri 2.x scaffold) — native shell around dashboard — 2026-05-23
+- [ ] apps/desktop: static export bundling + native menu / tray / deep links
 
 ## Shared Packages
 - [x] packages/shared-types — 2026-05-23

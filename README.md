@@ -121,7 +121,7 @@ open http://localhost:3300            # login: admin@example.com / password123
 | **Tailscale prod** | done   | `docker-compose.prod.yml` overlay binds API/Web to `$TAILSCALE_IP` only      |
 | **CI**             | done   | GitHub Actions runs pytest suite on push                                     |
 | **Mobile**         | scaffold | Expo Router · login + runs + approvals + agents tabs (`apps/mobile/`)      |
-| **Desktop**        | todo   | Tauri (P6)                                                                   |
+| **Desktop**        | scaffold | Tauri 2.x · native window around dashboard (`apps/desktop/`)               |
 
 ---
 
@@ -265,7 +265,7 @@ P2  Node Runtime                                                  ████�
 P3  Agent Runtime + tool loop + resume                            ████████████ done
 P4  Skills (10 real handlers)                                     ████████████ done
 P5  Memory (pgvector + embeddings)                                ████████████ done
-P6  Mobile (Expo) + Desktop (Tauri)                               ██████▒▒▒▒▒▒ wip
+P6  Mobile (Expo) + Desktop (Tauri)                               ████████▒▒▒▒ wip
 ```
 
 Tracked in [`CHECKLIST.md`](./CHECKLIST.md). Strategy in [`PLAN.md`](./PLAN.md).

@@ -1,0 +1,3 @@
+# Tauri expects platform icons at build time. Generate with:
+#   pnpm tauri icon ../../dashboard-web/src/app/icon.svg
+# (run from apps/desktop/) — produces 32x32.png, 128x128.png, icon.icns, icon.ico, etc.
