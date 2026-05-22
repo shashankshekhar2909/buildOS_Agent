@@ -1,19 +1,21 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Sidebar } from "@/components/sidebar";
+import { AppShell } from "@/components/app-shell";
 import { Providers } from "@/components/providers";
 
-export const metadata: Metadata = { title: "BuildAgent", description: "AI-native personal OS" };
+export const metadata: Metadata = {
+  title: { default: "BuildAgent — Control Room", template: "%s · BuildAgent" },
+  description: "AI-native personal OS. Multi-agent orchestration, distributed nodes, approvals, audit.",
+  applicationName: "BuildAgent",
+  themeColor: "#06070a",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-bg text-neutral-200 antialiased">
+      <body className="min-h-screen text-slate-200 antialiased">
         <Providers>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <main className="flex-1 p-6">{children}</main>
-          </div>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>

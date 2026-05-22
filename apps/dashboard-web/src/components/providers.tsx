@@ -1,7 +1,8 @@
 "use client";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { WS_URL, getToken } from "@/lib/api";
+import { WS_URL } from "@/lib/api";
+import { useSession } from "@/lib/session";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [qc] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 5_000 } } }));
@@ -15,10 +16,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
 function WSBridge() {
   const qc = useQueryClient();
+  const session = useSession();
+
   useEffect(() => {
-    const token = getToken();
-    if (!token) return;
-    const ws = new WebSocket(`${WS_URL}/client?token=${encodeURIComponent(token)}`);
+    if (!session.token) return;
+    const ws = new WebSocket(`${WS_URL}/client?token=${encodeURIComponent(session.token)}`);
     ws.onmessage = (m) => {
       try {
         const { event } = JSON.parse(m.data);
@@ -31,6 +33,6 @@ function WSBridge() {
       } catch {}
     };
     return () => ws.close();
-  }, [qc]);
+  }, [qc, session.token]);
   return null;
 }
