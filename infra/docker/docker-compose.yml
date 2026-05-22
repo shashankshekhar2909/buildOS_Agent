@@ -19,6 +19,7 @@ x-common-env: &common-env
   LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://127.0.0.1:3300}
   FERNET_KEY: ${FERNET_KEY:-}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-embed-small}
 
 services:
   postgres:

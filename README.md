@@ -116,7 +116,7 @@ open http://localhost:3300            # login: admin@example.com / password123
 | **Agents**         | done   | 6 presets, custom DB-backed, tool-calling loop, multi-provider model picker  |
 | **Agent runs**     | done   | Full message persistence, step trace, **resume-after-approval** loop         |
 | **Connectors**     | done   | Telegram + Slack bot token wizards, validated against bot API on save        |
-| **Memory (P5)**    | wip    | pgvector enabled · model + endpoints pending                                 |
+| **Memory (P5)**    | done   | pgvector · embeddings via LiteLLM · /v1/memory CRUD+search · memory skill    |
 | **Tests**          | todo   | pytest harness                                                               |
 | **Tailscale prod** | todo   | Compose override binding API + WS to tailnet only                            |
 | **Mobile/Desktop** | todo   | Expo + Tauri (P6)                                                            |
@@ -243,7 +243,7 @@ P1  Foundation                                                    ████�
 P2  Node Runtime                                                  ████████████ done
 P3  Agent Runtime + tool loop + resume                            ████████████ done
 P4  Skills (10 real handlers)                                     ████████████ done
-P5  Memory (pgvector + embeddings)                                ████▒▒▒▒▒▒▒▒ wip
+P5  Memory (pgvector + embeddings)                                ████████████ done
 P6  Mobile (Expo) + Desktop (Tauri)                               ▒▒▒▒▒▒▒▒▒▒▒▒ todo
 ```
 

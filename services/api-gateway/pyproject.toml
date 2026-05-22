@@ -19,6 +19,7 @@ dependencies = [
     "python-multipart>=0.0.12",
     "cryptography>=44",
     "openai>=1.54",
+    "pgvector>=0.3",
 ]
 
 [build-system]

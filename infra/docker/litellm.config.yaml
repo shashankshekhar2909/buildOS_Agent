@@ -47,6 +47,20 @@ model_list:
       model: groq/mixtral-8x7b-32768
       api_key: os.environ/GROQ_API_KEY
 
+  # ===== Embeddings =====
+  - model_name: embed-small
+    litellm_params:
+      model: openai/text-embedding-3-small
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: embed-large
+    litellm_params:
+      model: openai/text-embedding-3-large
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: embed-gemini
+    litellm_params:
+      model: gemini/text-embedding-004
+      api_key: os.environ/GEMINI_API_KEY
+
   # ===== Local Ollama =====
   - model_name: local-ollama
     litellm_params:

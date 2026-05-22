@@ -7,7 +7,7 @@ from app.bootstrap import ensure_bootstrap_admin
 from app.agent_catalog import sync_agent_catalog
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine  # noqa: F401
-from app.routers import agent_runs, agents, approvals, audit, auth, connectors, grants, models as models_router, nodes, secrets as secrets_router, skills, tasks
+from app.routers import agent_runs, agents, approvals, audit, auth, connectors, grants, memory as memory_router, models as models_router, nodes, secrets as secrets_router, skills, tasks
 from app.skill_loader import sync_skill_catalog
 from app.scheduler import run_task_scheduler
 from app.ws import client as ws_client, node as ws_node
@@ -55,6 +55,7 @@ app.include_router(grants.router)
 app.include_router(skills.router)
 app.include_router(agents.router)
 app.include_router(agent_runs.router)
+app.include_router(memory_router.router)
 app.include_router(models_router.router)
 app.include_router(ws_node.router)
 app.include_router(ws_client.router)

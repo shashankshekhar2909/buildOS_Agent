@@ -100,9 +100,12 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] connectors (telegram + slack bot token registration) — 2026-05-23
 
 ## P5 — Memory + AI Routing
-- [ ] memory-service skeleton
-- [ ] embeddings via LiteLLM
-- [ ] pgvector or qdrant decision
+- [x] pgvector decision — switched postgres image to pgvector/pgvector:pg16 — 2026-05-23
+- [x] embeddings via LiteLLM (embed-small/large/gemini model groups) — 2026-05-23
+- [x] memories table + ivfflat cosine index + alembic migration — 2026-05-23
+- [x] /v1/memory router (list/create/search/delete + _meta/model) — 2026-05-23
+- [x] memory skill (store/recall/list) wired into agent tool registry — 2026-05-23
+- [x] /memory UI rewrite: store form + semantic search + recent feed — 2026-05-23
 
 ## P6 — Mobile + Desktop
 - [ ] apps/mobile (Expo)
