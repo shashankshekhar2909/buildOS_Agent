@@ -56,7 +56,10 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] /agents /skills /tasks /logs /memory /settings stubs — 2026-05-23
 - [x] api client + WS hook + token storage — 2026-05-23
 - [x] Dockerfile (standalone output) — 2026-05-23
-- [ ] shadcn/ui init (needs `npx shadcn init` once node deps install)
+- [x] shadcn/ui primitives (button/badge/card/input/select/separator) — 2026-05-23
+- [x] brand mark + favicon (icon.svg, apple-icon.svg, LogoMark/Wordmark) — 2026-05-23
+- [x] /messages page (telegram + slack connector setup) — 2026-05-23
+- [x] /skills/[id] detail + run form — 2026-05-23
 - [x] approvals UI w/ approve/deny — 2026-05-23
 - [x] tasks UI w/ create form, state pills, cancel — 2026-05-23
 - [x] WS bridge invalidates queries on node./task./approval. events — 2026-05-23
@@ -76,9 +79,12 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] CoreAgent + Infra/Mail/Research/Dev/Notes — 2026-05-23
 - [x] task_engine skeleton — 2026-05-23
 - [x] inline dispatcher for command tasks (queued → node WS exec) — 2026-05-23
-- [ ] standalone agent-runtime worker (poll/dispatch/retry/deps for skill/agent/workflow kinds)
-- [ ] tool-calling loop
-- [ ] approval handshake from agent path
+- [x] in-process skill dispatcher (skill kind runs via skill_runtime in api-gateway) — 2026-05-23
+- [x] scheduler loop (pending → queued when scheduled_at due) — 2026-05-23
+- [x] task recurrence (cron-like respawn on completion) — 2026-05-23
+- [x] approval handshake (per-skill manifest.requires_approval gate) — 2026-05-23
+- [ ] standalone agent-runtime worker (separate process for agent/workflow kinds)
+- [ ] tool-calling loop in CoreAgent (LiteLLM tools= round-trip)
 
 ## P4 — Skills
 - [x] packages/skill-sdk — 2026-05-23
@@ -86,8 +92,9 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] skills/filesystem (stub) — 2026-05-23
 - [x] skills/notes (stub) — 2026-05-23
 - [x] skills/gmail /calendar /ssh /proxmox (stubs) — 2026-05-23
-- [ ] real handlers
-- [ ] skill registry endpoint in api-gateway
+- [x] real handlers — docker, filesystem, gmail, calendar, notes, proxmox, ssh, slack, telegram, whatsapp — 2026-05-23
+- [x] skill registry endpoint in api-gateway (/v1/skills CRUD + /run) — 2026-05-23
+- [x] connectors (telegram + slack bot token registration) — 2026-05-23
 
 ## P5 — Memory + AI Routing
 - [ ] memory-service skeleton
