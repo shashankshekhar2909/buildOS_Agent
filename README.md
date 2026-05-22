@@ -117,7 +117,7 @@ open http://localhost:3300            # login: admin@example.com / password123
 | **Agent runs**     | done   | Full message persistence, step trace, **resume-after-approval** loop         |
 | **Connectors**     | done   | Telegram + Slack bot token wizards, validated against bot API on save        |
 | **Memory (P5)**    | done   | pgvector · embeddings via LiteLLM · /v1/memory CRUD+search · memory skill    |
-| **Tests**          | todo   | pytest harness                                                               |
+| **Tests**          | done   | pytest integration harness · 27 tests · `make test`                          |
 | **Tailscale prod** | todo   | Compose override binding API + WS to tailnet only                            |
 | **Mobile/Desktop** | todo   | Expo + Tauri (P6)                                                            |
 

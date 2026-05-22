@@ -45,7 +45,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] alembic env.py + script.py.mako + alembic.ini — 2026-05-23
 - [x] init revision generated + applied against live postgres — 2026-05-23
 - [x] dispatcher: command tasks → node WS, persist task.result/started — 2026-05-23
-- [ ] tests
+- [x] tests (pytest integration harness, 27 tests over auth/skills/tasks/approvals/agents/memory/nodes/models) — 2026-05-23
 
 ### Dashboard (apps/dashboard-web)
 - [x] Next.js 15 + TS + Tailwind + dark — 2026-05-23

@@ -1,4 +1,4 @@
-.PHONY: up down logs api web node fmt
+.PHONY: up down logs api web node fmt test test-install
 
 up:
 	bash infra/scripts/bootstrap.sh
@@ -23,3 +23,10 @@ migrate:
 
 revision:
 	cd services/api-gateway && uv run alembic revision --autogenerate -m "$(m)"
+
+test-install:
+	python3 -m venv .venv-test
+	.venv-test/bin/pip install -q -r tests/requirements.txt
+
+test:
+	PYTHONPATH=. .venv-test/bin/python -m pytest tests -c tests/pytest.ini

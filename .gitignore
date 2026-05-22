@@ -17,3 +17,5 @@ coverage
 *.sqlite
 *.db
 .antigravitycli/
+.venv-test/
+.pytest_cache/
