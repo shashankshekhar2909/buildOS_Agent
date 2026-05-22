@@ -42,7 +42,8 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] healthz/readyz — 2026-05-23
 - [x] Dockerfile — 2026-05-23
 - [x] dev-mode auto create_all (alembic later) — 2026-05-23
-- [x] alembic env.py + script.py.mako + alembic.ini — 2026-05-23 (run `make revision m=init` once postgres is up to autogen)
+- [x] alembic env.py + script.py.mako + alembic.ini — 2026-05-23
+- [x] init revision generated + applied against live postgres — 2026-05-23
 - [x] dispatcher: command tasks → node WS, persist task.result/started — 2026-05-23
 - [ ] tests
 
@@ -113,5 +114,6 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] INTERNAL_SERVICE_TOKEN header for service-to-service — 2026-05-23
 - [x] secrets encrypted at rest (fernet) + /v1/secrets endpoint — 2026-05-23
 - [x] refresh token rotation (jti+family, redis-backed, reuse detection revokes family) — 2026-05-23
-- [ ] per-skill permission scopes enforced
+- [x] per-skill permission scopes enforced (SkillGrant table + /v1/grants + tasks router gate) — 2026-05-23
+- [x] live smoke test end-to-end pass (register → node → command → approval → dispatch → failed:node-offline) — 2026-05-23
 - [ ] Tailscale-only bind in prod compose override
