@@ -4,9 +4,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.bootstrap import ensure_bootstrap_admin
+from app.agent_catalog import sync_agent_catalog
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine  # noqa: F401
-from app.routers import agents, approvals, audit, auth, connectors, grants, nodes, secrets as secrets_router, skills, tasks
+from app.routers import agents, approvals, audit, auth, connectors, grants, models as models_router, nodes, secrets as secrets_router, skills, tasks
 from app.skill_loader import sync_skill_catalog
 from app.scheduler import run_task_scheduler
 from app.ws import client as ws_client, node as ws_node
@@ -21,6 +22,7 @@ async def lifespan(_: FastAPI):
     async with SessionLocal() as db:
         await ensure_bootstrap_admin(db)
         await sync_skill_catalog(db)
+        await sync_agent_catalog(db)
     scheduler_task = asyncio.create_task(run_task_scheduler(stop_event))
     yield
     stop_event.set()
@@ -52,6 +54,7 @@ app.include_router(connectors.router)
 app.include_router(grants.router)
 app.include_router(skills.router)
 app.include_router(agents.router)
+app.include_router(models_router.router)
 app.include_router(ws_node.router)
 app.include_router(ws_client.router)
 

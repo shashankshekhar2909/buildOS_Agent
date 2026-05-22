@@ -129,18 +129,22 @@ async def run_agent(
     model: str = "claude-sonnet",
     max_steps: int = 6,
     skill_overrides: list[str] | None = None,
+    system_prompt: str | None = None,
+    skill_names: list[str] | None = None,
     approval_resolver=None,
 ) -> RunResult:
     preset = AGENT_PRESETS.get(agent_name)
-    if not preset:
+    if not preset and not system_prompt:
         return RunResult(output="", stop_reason=f"unknown agent {agent_name}")
 
     available = list(skill_registry().keys())
-    allowed = skill_overrides or preset["skills"] or available
+    prompt = system_prompt or (preset["system_prompt"] if preset else "")
+    base_skills = skill_names if skill_names is not None else (preset["skills"] if preset else None)
+    allowed = skill_overrides or base_skills or available
     allowed = [s for s in allowed if s in available]
     tools = _build_tools(allowed)
 
-    messages: list[dict] = [{"role": "system", "content": preset["system_prompt"]}]
+    messages: list[dict] = [{"role": "system", "content": prompt}]
     messages.append({"role": "user", "content": user_msg})
 
     client = _llm_client()
