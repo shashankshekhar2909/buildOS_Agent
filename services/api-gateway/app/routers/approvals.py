@@ -10,6 +10,7 @@ from app.dispatcher import dispatch
 from app.events import publish
 from app.models import Approval, ApprovalState, AuditLog, Task, TaskState, User
 from app.schemas import ApprovalDecision, ApprovalOut
+from app.task_schedule import should_delay
 
 router = APIRouter(prefix="/v1/approvals", tags=["approvals"])
 
@@ -47,7 +48,7 @@ async def decide(
     if appr.task_id:
         task = (await db.execute(select(Task).where(Task.id == appr.task_id))).scalar_one_or_none()
         if task:
-            task.state = TaskState.queued if body.approve else TaskState.cancelled
+            task.state = TaskState.pending if body.approve and should_delay(task.scheduled_at) else (TaskState.queued if body.approve else TaskState.cancelled)
 
     db.add(AuditLog(
         actor_id=user.id,
@@ -60,6 +61,6 @@ async def decide(
     await publish("approval.decided", {"id": approval_id, "approve": body.approve, "task_id": str(appr.task_id) if appr.task_id else None})
     if body.approve and appr.task_id:
         task = (await db.execute(select(Task).where(Task.id == appr.task_id))).scalar_one_or_none()
-        if task:
+        if task and task.state == TaskState.queued:
             await dispatch(db, task)
     return ApprovalOut.model_validate(appr)

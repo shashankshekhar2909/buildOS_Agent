@@ -9,7 +9,7 @@ from app.auth.jwt import hash_password
 from app.db import get_db
 from app.events import publish
 from app.models import AuditLog, Node, User
-from app.schemas import NodeIn, NodeOut, NodeRegisterOut
+from app.schemas import NodeIn, NodeOut, NodeRegisterOut, NodeUpdateIn
 
 router = APIRouter(prefix="/v1/nodes", tags=["nodes"])
 
@@ -30,13 +30,38 @@ async def create_node(
     user: Annotated[User, Depends(require_role("admin", "operator"))],
 ) -> NodeRegisterOut:
     token = secrets.token_urlsafe(32)
-    node = Node(name=body.name, tags=body.tags, token_hash=hash_password(token))
+    node = Node(name=body.name, tags=body.tags, status=body.status, capabilities=body.capabilities, token_hash=hash_password(token))
     db.add(node)
     db.add(AuditLog(actor_id=user.id, action="node.create", target_kind="node", target_id=body.name))
     await db.commit()
     await db.refresh(node)
     await publish("node.created", {"id": str(node.id), "name": node.name})
     return NodeRegisterOut(node=NodeOut.model_validate(node), register_token=token)
+
+
+@router.patch("/{node_id}", response_model=NodeOut)
+async def update_node(
+    node_id: str,
+    body: NodeUpdateIn,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(require_role("admin"))],
+) -> NodeOut:
+    node = (await db.execute(select(Node).where(Node.id == node_id))).scalar_one_or_none()
+    if not node:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "node not found")
+    if body.name is not None:
+        node.name = body.name
+    if body.tags is not None:
+        node.tags = body.tags
+    if body.status is not None:
+        node.status = body.status
+    if body.capabilities is not None:
+        node.capabilities = body.capabilities
+    db.add(AuditLog(actor_id=user.id, action="node.update", target_kind="node", target_id=node_id))
+    await db.commit()
+    await db.refresh(node)
+    await publish("node.updated", {"id": node_id, "name": node.name})
+    return NodeOut.model_validate(node)
 
 
 @router.get("/{node_id}", response_model=NodeOut)

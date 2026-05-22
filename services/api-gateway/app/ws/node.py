@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.events import publish
 from app.models import Node, Task, TaskState
+from app.task_recurrence import spawn_repeat_task
 from app.ws.manager import manager
 
 router = APIRouter()
@@ -72,6 +73,7 @@ async def node_socket(ws: WebSocket, token: str = Query(...), node_id: str = Que
                         t.error = None if data.get("ok") else (data.get("error") or data.get("stderr") or "failed")
                         t.finished_at = datetime.now(tz=timezone.utc)
                         await db.commit()
+                        await spawn_repeat_task(db, t)
                 await manager.broadcast_clients({"event": kind, "data": data})
                 await publish(kind, data)
             elif kind == "task.log":

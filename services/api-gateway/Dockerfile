@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY services/api-gateway/pyproject.toml ./pyproject.toml
 RUN pip install --upgrade pip && pip install -e .
 
+COPY packages/skill-sdk ./packages/skill-sdk
+COPY skills ./skills
 COPY services/api-gateway/app ./app
 COPY services/api-gateway/alembic ./alembic
 COPY services/api-gateway/alembic.ini ./alembic.ini

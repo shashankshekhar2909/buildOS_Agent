@@ -16,11 +16,13 @@ class Settings(BaseSettings):
 
     node_token: str = "change-me-node-shared-secret"
     internal_service_token: str = "change-me-internal-service-token"
+    bootstrap_admin_email: str = ""
+    bootstrap_admin_password: str = ""
 
     litellm_url: str = "http://localhost:4000"
     litellm_master_key: str = "sk-buildagent-master"
 
-    cors_origins_raw: str = Field(default="http://localhost:3300", alias="CORS_ORIGINS")
+    cors_origins_raw: str = Field(default="http://127.0.0.1:3300", alias="CORS_ORIGINS")
 
     @property
     def cors_origins(self) -> list[str]:

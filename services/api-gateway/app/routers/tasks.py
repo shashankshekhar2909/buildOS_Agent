@@ -7,7 +7,9 @@ from app.auth.deps import current_user, require_role
 from app.db import get_db
 from app.dispatcher import dispatch
 from app.events import publish
-from app.models import Approval, ApprovalState, AuditLog, SkillGrant, Task, TaskState, User
+from app.models import Approval, ApprovalState, AuditLog, Task, TaskState, User
+from app.skill_tasks import build_skill_task
+from app.task_schedule import should_delay
 from app.schemas import TaskIn, TaskOut
 
 router = APIRouter(prefix="/v1/tasks", tags=["tasks"])
@@ -31,31 +33,38 @@ async def create_task(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(require_role("admin", "operator"))],
 ) -> TaskOut:
-    # Admins bypass skill grants; everyone else needs an explicit grant per skill name.
-    if body.kind == "skill" and user.role != "admin":
-        skill_name = body.payload.get("name") if isinstance(body.payload, dict) else None
-        if not skill_name:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "skill task requires payload.name")
-        granted = (await db.execute(
-            select(SkillGrant).where(SkillGrant.user_id == user.id, SkillGrant.skill_name == skill_name)
-        )).scalar_one_or_none()
-        if not granted:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, f"no grant for skill '{skill_name}'")
+    payload = dict(body.payload or {})
+    if body.repeat_every_minutes:
+        payload["_repeat_every_minutes"] = body.repeat_every_minutes
+    if body.repeat_until:
+        payload["_repeat_until"] = body.repeat_until.isoformat()
+    if body.template:
+        payload["_template"] = body.template
 
-    needs_approval = body.kind in APPROVAL_REQUIRED_KINDS
-    task = Task(
-        title=body.title,
-        kind=body.kind,
-        payload=body.payload,
-        node_id=body.node_id,
-        scheduled_at=body.scheduled_at,
-        created_by=user.id,
-        state=TaskState.waiting_approval if needs_approval else TaskState.queued,
-    )
-    db.add(task)
-    await db.flush()
-    if needs_approval:
-        db.add(Approval(task_id=task.id, action=body.kind, risk="high", payload=body.payload))
+    if body.kind == "skill":
+        task = await build_skill_task(
+            db,
+            user,
+            title=body.title,
+            payload=payload,
+            node_id=body.node_id,
+            scheduled_at=body.scheduled_at,
+        )
+    else:
+        needs_approval = body.kind in APPROVAL_REQUIRED_KINDS
+        task = Task(
+            title=body.title,
+            kind=body.kind,
+            payload=payload,
+            node_id=body.node_id,
+            scheduled_at=body.scheduled_at,
+            created_by=user.id,
+            state=TaskState.waiting_approval if needs_approval else (TaskState.pending if should_delay(body.scheduled_at) else TaskState.queued),
+        )
+        db.add(task)
+        await db.flush()
+        if needs_approval:
+            db.add(Approval(task_id=task.id, action=body.kind, risk="high", payload=body.payload))
     db.add(AuditLog(actor_id=user.id, action=f"task.create:{body.kind}", target_kind="task", target_id=str(task.id)))
     await db.commit()
     await db.refresh(task)

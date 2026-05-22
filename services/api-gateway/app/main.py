@@ -1,10 +1,14 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.bootstrap import ensure_bootstrap_admin
 from app.config import get_settings
-from app.db import Base, engine  # noqa: F401
-from app.routers import approvals, audit, auth, grants, nodes, secrets as secrets_router, tasks
+from app.db import Base, SessionLocal, engine  # noqa: F401
+from app.routers import approvals, audit, auth, connectors, grants, nodes, secrets as secrets_router, skills, tasks
+from app.skill_loader import sync_skill_catalog
+from app.scheduler import run_task_scheduler
 from app.ws import client as ws_client, node as ws_node
 
 settings = get_settings()
@@ -13,7 +17,18 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # Schema owned by alembic — run `make migrate` before first boot.
+    stop_event = asyncio.Event()
+    async with SessionLocal() as db:
+        await ensure_bootstrap_admin(db)
+        await sync_skill_catalog(db)
+    scheduler_task = asyncio.create_task(run_task_scheduler(stop_event))
     yield
+    stop_event.set()
+    scheduler_task.cancel()
+    try:
+        await scheduler_task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(title="BuildAgent API", version="0.0.1", lifespan=lifespan)
@@ -21,6 +36,7 @@ app = FastAPI(title="BuildAgent API", version="0.0.1", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=r"^https?://.+:3300$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,7 +48,9 @@ app.include_router(tasks.router)
 app.include_router(approvals.router)
 app.include_router(audit.router)
 app.include_router(secrets_router.router)
+app.include_router(connectors.router)
 app.include_router(grants.router)
+app.include_router(skills.router)
 app.include_router(ws_node.router)
 app.include_router(ws_client.router)
 

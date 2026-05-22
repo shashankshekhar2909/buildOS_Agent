@@ -35,6 +35,15 @@ class UserOut(BaseModel):
 class NodeIn(BaseModel):
     name: str
     tags: list[str] = []
+    status: str = "offline"
+    capabilities: dict = {}
+
+
+class NodeUpdateIn(BaseModel):
+    name: str | None = None
+    tags: list[str] | None = None
+    status: str | None = None
+    capabilities: dict | None = None
 
 
 class NodeOut(BaseModel):
@@ -62,6 +71,9 @@ class TaskIn(BaseModel):
     payload: dict = {}
     node_id: UUID | None = None
     scheduled_at: datetime | None = None
+    repeat_every_minutes: int | None = None
+    repeat_until: datetime | None = None
+    template: str | None = None
 
 
 class TaskOut(BaseModel):
@@ -95,3 +107,45 @@ class ApprovalOut(BaseModel):
 class ApprovalDecision(BaseModel):
     approve: bool
     note: str | None = None
+
+
+class SkillOut(BaseModel):
+    id: UUID
+    name: str
+    version: str
+    description: str
+    permissions: list[str]
+    requires_approval: bool
+    enabled: bool
+    manifest: dict
+
+    class Config:
+        from_attributes = True
+
+
+class SkillPatchIn(BaseModel):
+    enabled: bool
+
+
+class SkillCreateIn(BaseModel):
+    name: str
+    version: str = "0.1.0"
+    description: str = ""
+    permissions: list[str] = []
+    requires_approval: bool = True
+    enabled: bool = True
+    manifest: dict = {}
+
+
+class SkillUpdateIn(BaseModel):
+    name: str
+    version: str
+    description: str
+    permissions: list[str]
+    requires_approval: bool
+    enabled: bool
+    manifest: dict = {}
+
+
+class SkillRunIn(BaseModel):
+    payload: dict = Field(default_factory=dict)
