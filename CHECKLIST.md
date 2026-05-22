@@ -83,8 +83,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] scheduler loop (pending → queued when scheduled_at due) — 2026-05-23
 - [x] task recurrence (cron-like respawn on completion) — 2026-05-23
 - [x] approval handshake (per-skill manifest.requires_approval gate) — 2026-05-23
-- [ ] standalone agent-runtime worker (separate process for agent/workflow kinds)
-- [ ] tool-calling loop in CoreAgent (LiteLLM tools= round-trip)
+- [x] tool-calling loop wired to skill registry (api-gateway in-process + agent-runtime mirror) — 2026-05-23
+- [x] GET /v1/agents + POST /v1/agents/{name}/run with audit + 502 on upstream fail — 2026-05-23
+- [x] /agents UI: agent picker, runner, step trace — 2026-05-23
+- [ ] persist agent run + resume after approval (approval_required → Approval row → resume)
+- [ ] standalone agent-runtime worker (separate process for long-running orchestration)
 
 ## P4 — Skills
 - [x] packages/skill-sdk — 2026-05-23
