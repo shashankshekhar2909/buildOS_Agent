@@ -44,9 +44,17 @@ Or scan the QR code with Expo Go.
 - Run detail screen `/run/[id]` — step trace + inline approve/deny when
   the run is paused on an approval
 
+## Push notifications
+
+- On first sign-in the app requests Notifications permission, fetches an
+  Expo push token, and POSTs it to `/v1/devices` (token persists per-user).
+- Backend `app/push.py` sends to all of a user's device tokens via
+  `https://exp.host/--/api/v2/push/send` whenever an agent run pauses
+  on an approval.
+- Tapping the push opens the corresponding `/run/{id}` detail screen.
+- Simulator/emulator can't receive push — must run on a real device.
+
 ## What's not (yet)
 
-- Push notifications on approval-needed (expo-notifications + backend
-  device-token registration)
 - Connector setup (Telegram/Slack token entry)
 - Memory tab

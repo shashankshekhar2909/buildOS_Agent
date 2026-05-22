@@ -111,7 +111,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] apps/mobile (Expo Router) — login, runs, approvals, agents tabs — 2026-05-23
 - [x] apps/mobile: WS live updates (src/ws.ts) — 2026-05-23
 - [x] apps/mobile: agent-run detail screen with inline approve/deny — 2026-05-23
-- [ ] apps/mobile: push notifications on approval-needed
+- [x] apps/mobile: push notifications on approval-needed (Expo Push + /v1/devices) — 2026-05-23
 - [x] apps/desktop (Tauri 2.x scaffold) — native shell around dashboard — 2026-05-23
 - [ ] apps/desktop: static export bundling + native menu / tray / deep links
 

@@ -19,8 +19,17 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#7c5cff"
+        }
+      ]
     ],
+    "notification": {
+      "iosDisplayInForeground": true
+    },
     "extra": {
       "router": {},
       "apiUrl": "http://100.64.108.107:8800"

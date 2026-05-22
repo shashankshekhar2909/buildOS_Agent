@@ -3,6 +3,7 @@ from app.models.node import Node
 from app.models.agent import Agent
 from app.models.agent_run import AgentRun, AgentRunState
 from app.models.memory import Memory
+from app.models.device import Device
 from app.models.task import Task, TaskState
 from app.models.audit import AuditLog
 from app.models.approval import Approval, ApprovalState
@@ -17,6 +18,7 @@ __all__ = [
     "AgentRun",
     "AgentRunState",
     "Memory",
+    "Device",
     "Task",
     "TaskState",
     "AuditLog",

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { useSession } from "@/src/session";
 import { useEventBridge } from "@/src/ws";
+import { onNotificationTap, registerForPush } from "@/src/push";
 
 const qc = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, refetchInterval: 30_000 } },
@@ -21,6 +22,21 @@ function Guard() {
     if (!session.token && !inAuth) router.replace("/(auth)/login");
     if (session.token && inAuth) router.replace("/(tabs)/runs");
   }, [session.ready, session.token, segments, router]);
+
+  // Register device push token after sign-in.
+  useEffect(() => {
+    if (!session.token) return;
+    registerForPush().catch((e) => console.warn("push register error", e));
+  }, [session.token]);
+
+  // Tap on a push -> navigate to that run.
+  useEffect(() => {
+    return onNotificationTap((data) => {
+      if (data?.type === "approval" && typeof data.agent_run_id === "string") {
+        router.push(`/run/${data.agent_run_id}`);
+      }
+    });
+  }, [router]);
 
   return null;
 }

@@ -12,7 +12,8 @@ from app.agent_catalog import sync_agent_catalog
 from app.auth.deps import current_user, require_role
 from app.db import get_db
 from app.events import publish
-from app.models import Agent, AgentRun, AgentRunState, Approval, ApprovalState, AuditLog, User
+from app.models import Agent, AgentRun, AgentRunState, Approval, ApprovalState, AuditLog, Device, User
+from app.push import send_push
 
 router = APIRouter(prefix="/v1/agents", tags=["agents"])
 
@@ -264,6 +265,17 @@ async def run_(
     await publish("agent_run.updated", {"id": str(run.id), "state": run.state.value, "stop_reason": run.stop_reason})
     if run.state == AgentRunState.waiting_approval:
         await publish("approval.created", {"agent_run_id": str(run.id)})
+        # Push to user's mobile devices. Best-effort.
+        device_rows = (await db.execute(select(Device).where(Device.user_id == user.id))).scalars().all()
+        tokens = [d.push_token for d in device_rows]
+        if tokens and result.pending_tool:
+            pt = result.pending_tool
+            await send_push(
+                tokens,
+                title="Approval needed",
+                body=f"{agent.name}: {pt.get('skill', pt.get('tool', 'tool'))}",
+                data={"type": "approval", "agent_run_id": str(run.id), "tool": pt.get("tool")},
+            )
     payload = result.to_dict()
     payload["run_id"] = str(run.id)
     payload["state"] = run.state.value
