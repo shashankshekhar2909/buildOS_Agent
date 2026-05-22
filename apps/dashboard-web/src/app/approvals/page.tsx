@@ -21,7 +21,7 @@ export default function Approvals() {
   const { data = [] } = useQuery<Approval[]>({
     queryKey: ["approvals"],
     queryFn: () => api<Approval[]>("/v1/approvals"),
-    refetchInterval: 3000,
+    refetchInterval: 30000,
   });
 
   const decide = useMutation({

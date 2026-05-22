@@ -11,6 +11,7 @@ from app.agent_runtime import StepTrace, drive_loop, resolve_skills
 from app.agent_catalog import sync_agent_catalog
 from app.auth.deps import current_user, require_role
 from app.db import get_db
+from app.events import publish
 from app.models import Agent, AgentRun, AgentRunState, Approval, ApprovalState, AuditLog, User
 
 router = APIRouter(prefix="/v1/agents", tags=["agents"])
@@ -260,6 +261,9 @@ async def run_(
     ))
     await db.commit()
     await db.refresh(run)
+    await publish("agent_run.updated", {"id": str(run.id), "state": run.state.value, "stop_reason": run.stop_reason})
+    if run.state == AgentRunState.waiting_approval:
+        await publish("approval.created", {"agent_run_id": str(run.id)})
     payload = result.to_dict()
     payload["run_id"] = str(run.id)
     payload["state"] = run.state.value

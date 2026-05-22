@@ -11,6 +11,7 @@ from app.routers import agent_runs, agents, approvals, audit, auth, connectors, 
 from app.skill_loader import sync_skill_catalog
 from app.scheduler import run_task_scheduler
 from app.ws import client as ws_client, node as ws_node
+from app.ws.bridge import run_event_bridge
 
 settings = get_settings()
 
@@ -24,13 +25,16 @@ async def lifespan(_: FastAPI):
         await sync_skill_catalog(db)
         await sync_agent_catalog(db)
     scheduler_task = asyncio.create_task(run_task_scheduler(stop_event))
+    bridge_task = asyncio.create_task(run_event_bridge(stop_event))
     yield
     stop_event.set()
     scheduler_task.cancel()
-    try:
-        await scheduler_task
-    except asyncio.CancelledError:
-        pass
+    bridge_task.cancel()
+    for t in (scheduler_task, bridge_task):
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="BuildAgent API", version="0.0.1", lifespan=lifespan)

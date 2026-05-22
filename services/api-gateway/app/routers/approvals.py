@@ -73,6 +73,8 @@ async def decide(
 
     if appr.agent_run_id:
         await _resume_agent_run(db, appr, approved=body.approve)
+        await db.commit()
+        await publish("agent_run.updated", {"id": str(appr.agent_run_id)})
 
     return ApprovalOut.model_validate(appr)
 

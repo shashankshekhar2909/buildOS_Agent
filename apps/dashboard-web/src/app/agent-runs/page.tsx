@@ -34,7 +34,7 @@ export default function AgentRunsPage() {
   const runsQ = useQuery<Run[]>({
     queryKey: ["agent-runs"],
     queryFn: () => api<Run[]>("/v1/agent-runs"),
-    refetchInterval: 5000,
+    refetchInterval: 30000,
   });
   const runs = runsQ.data ?? [];
 

@@ -34,7 +34,7 @@ export default function Tasks() {
   const { data: tasks = [] } = useQuery<Task[]>({
     queryKey: ["tasks"],
     queryFn: () => api<Task[]>("/v1/tasks"),
-    refetchInterval: 3000,
+    refetchInterval: 30000,
   });
 
   const [title, setTitle] = useState("");

@@ -55,14 +55,14 @@ export default function AgentRunDetail() {
   const runQ = useQuery<Run>({
     queryKey: ["agent-run", id],
     queryFn: () => api<Run>(`/v1/agent-runs/${id}`),
-    refetchInterval: 3000,
+    refetchInterval: 30000,
     enabled: Boolean(id),
   });
 
   const approvalsQ = useQuery<Approval[]>({
     queryKey: ["approvals"],
     queryFn: () => api<Approval[]>("/v1/approvals"),
-    refetchInterval: 3000,
+    refetchInterval: 30000,
   });
 
   const linkedApproval = approvalsQ.data?.find((a) => a.agent_run_id === id && a.state === "pending");
