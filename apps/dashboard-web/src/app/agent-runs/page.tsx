@@ -46,13 +46,20 @@ export default function AgentRunsPage() {
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
           Every agent invocation. Open one to see the full step trace and resume status.
         </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          <Metric label="Total" value={String(runs.length)} />
+          <Metric label="Running" value={String(runs.filter((r) => r.state === "running").length)} />
+          <Metric label="Waiting approval" value={String(runs.filter((r) => r.state === "waiting_approval").length)} />
+          <Metric label="Completed" value={String(runs.filter((r) => r.state === "completed").length)} />
+        </div>
       </section>
 
       <section className="rounded-2xl border border-border bg-panel overflow-hidden">
-        <div className="grid grid-cols-[1fr,120px,140px,100px,180px] gap-3 border-b border-border bg-bg/40 px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted">
+        <div className="grid grid-cols-[1.2fr,120px,140px,160px,100px,180px] gap-3 border-b border-border bg-bg/40 px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted">
           <div>Message</div>
           <div>Agent</div>
           <div>State</div>
+          <div>Skills</div>
           <div>Steps</div>
           <div>Created</div>
         </div>
@@ -64,7 +71,7 @@ export default function AgentRunsPage() {
             <Link
               key={r.id}
               href={`/agent-runs/${r.id}`}
-              className="grid grid-cols-[1fr,120px,140px,100px,180px] gap-3 px-4 py-3 text-sm text-white hover:bg-white/[0.03]"
+              className="grid grid-cols-[1.2fr,120px,140px,160px,100px,180px] gap-3 px-4 py-3 text-sm text-white hover:bg-white/[0.03]"
             >
               <div className="min-w-0 truncate" title={r.initial_message}>{r.initial_message}</div>
               <div className="truncate text-slate-300">{r.agent_name}</div>
@@ -76,12 +83,22 @@ export default function AgentRunsPage() {
                   <Badge variant="outline" className="ml-2 text-[10px]">{r.pending_tool.skill}</Badge>
                 )}
               </div>
+              <div className="truncate text-slate-400">{r.skills?.length ? r.skills.join(", ") : "none"}</div>
               <div className="text-muted">{r.steps?.length ?? 0}</div>
               <div className="text-muted">{new Date(r.created_at).toLocaleString()}</div>
             </Link>
           ))}
         </div>
       </section>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-bg/60 px-4 py-3">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-muted">{label}</div>
+      <div className="mt-2 text-xl font-semibold text-white">{value}</div>
     </div>
   );
 }

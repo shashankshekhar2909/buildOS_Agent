@@ -7,6 +7,9 @@ import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 type Task = {
   id: string;
@@ -164,93 +167,103 @@ export default function Tasks() {
   }, [kind, cmd, payloadText]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-in">
+      {/* Page Header */}
       <div>
-        <p className="text-xs uppercase tracking-[0.25em] text-muted">Tasks</p>
-        <h1 className="mt-2 text-3xl font-semibold text-white">Task builder</h1>
-        <p className="mt-2 text-sm text-muted">Use templates for checks, schedules, and recurring jobs.</p>
+        <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-accent">Automation</span>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-white font-sans">Task Builder</h1>
+        <p className="mt-2 text-sm text-slate-400 font-sans">
+          Schedule one-off or repeating tasks, test command invocations, and manage recurring automation routines.
+        </p>
       </div>
 
-      <Card className="border-white/10 bg-slate-950/70">
-        <CardHeader>
-          <CardTitle className="text-white">Templates</CardTitle>
-          <CardDescription>One click presets. They still stay editable before create.</CardDescription>
+      {/* Templates Selector Section */}
+      <Card className="border-white/[0.06] bg-slate-950/40 backdrop-blur-md shadow-2xl">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-bold text-white font-sans">Preset Automation Templates</CardTitle>
+          <CardDescription className="text-xs text-slate-400">
+            One-click presets to populate templates. Elements remain fully editable before creation.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {presets.map((preset) => (
             <button
               key={preset.id}
               type="button"
-              className="rounded-2xl border border-border bg-bg p-4 text-left transition hover:border-white/30 hover:bg-white/5"
+              className={cn(
+                "rounded-2xl border p-4 text-left transition-all duration-300 relative group overflow-hidden",
+                templateLabel === preset.label
+                  ? "bg-accent/10 border-accent/30 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
+                  : "border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/[0.12] hover:-translate-y-0.5"
+              )}
               onClick={() => applyPreset(preset)}
             >
-              <div className="text-sm font-semibold text-white">{preset.label}</div>
-              <div className="mt-2 text-xs leading-5 text-muted">{preset.description}</div>
+              <div className="text-sm font-semibold text-white group-hover:text-accent transition-colors">{preset.label}</div>
+              <div className="mt-2 text-xs leading-relaxed text-slate-400 font-sans">{preset.description}</div>
             </button>
           ))}
         </CardContent>
       </Card>
 
-      <Card className="border-white/10 bg-slate-950/70">
-        <CardHeader>
-          <CardTitle className="text-white">New task</CardTitle>
-          <CardDescription>Create a one-off or recurring task.</CardDescription>
+      {/* New Task Creator Console */}
+      <Card className="border-white/[0.06] bg-slate-950/40 backdrop-blur-md shadow-2xl">
+        <CardHeader className="pb-4 border-b border-white/[0.06] bg-white/[0.01]">
+          <CardTitle className="text-base font-bold text-white font-sans">Operational Builder Console</CardTitle>
+          <CardDescription className="text-xs text-slate-400">
+            Define target payload, triggers, and recurrence frequencies.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <Field label="Title">
-              <input
-                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+        <CardContent className="space-y-6 pt-6">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Task Title">
+              <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Daily Gmail digest"
+                placeholder="e.g. System Health Check"
               />
             </Field>
-            <Field label="Kind">
-              <select
-                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+            <Field label="Automation Kind">
+              <Select
                 value={kind}
                 onChange={(e) => setKind(e.target.value)}
               >
                 {KINDS.map((k) => (
-                  <option key={k} value={k}>
+                  <option key={k} value={k} className="bg-[#0b0c10]">
                     {k}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
-            <Field label="Schedule at">
-              <input
-                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+            <Field label="Execution Schedule (Triggers)">
+              <Input
                 type="datetime-local"
                 value={scheduledAt}
                 onChange={(e) => setScheduledAt(e.target.value)}
+                className="font-mono text-xs uppercase"
               />
             </Field>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <Field label="Repeat every minutes">
-              <input
-                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Recurrence Interval (minutes)">
+              <Input
                 type="number"
                 min={1}
                 value={repeatEveryMinutes}
                 onChange={(e) => setRepeatEveryMinutes(e.target.value)}
-                placeholder="15"
+                placeholder="e.g. 15 (optional)"
               />
             </Field>
-            <Field label="Repeat until">
-              <input
-                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+            <Field label="Recurrence Bound (Until Date)">
+              <Input
                 type="datetime-local"
                 value={repeatUntil}
                 onChange={(e) => setRepeatUntil(e.target.value)}
+                className="font-mono text-xs uppercase"
               />
             </Field>
-            <Field label="Template">
-              <input
-                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+            <Field label="Template Source Identification">
+              <Input
                 value={templateLabel}
                 onChange={(e) => setTemplateLabel(e.target.value)}
                 placeholder="manual"
@@ -258,67 +271,103 @@ export default function Tasks() {
             </Field>
           </div>
 
+          <div className="grid gap-3 md:grid-cols-3">
+            <InfoPill label="Start" value={scheduledAt ? new Date(scheduledAt).toLocaleString() : "run now"} />
+            <InfoPill label="Repeat" value={repeatEveryMinutes ? `every ${repeatEveryMinutes} min` : "one-off"} />
+            <InfoPill label="End" value={repeatUntil ? new Date(repeatUntil).toLocaleString() : "no end"} />
+          </div>
+
           {kind === "command" ? (
-            <Field label="Command">
-              <input
-                className="w-full rounded-xl border border-border bg-bg px-3 py-2 font-mono text-sm text-slate-100 outline-none"
-                placeholder="uptime"
+            <Field label="Execute Command Line Directive">
+              <Input
+                placeholder="e.g. uptime"
                 value={cmd}
                 onChange={(e) => setCmd(e.target.value)}
+                className="font-mono text-xs"
               />
             </Field>
           ) : (
-            <Field label="Payload JSON">
+            <Field label="Granted Operation Payload (JSON format)">
               <textarea
-                className="min-h-40 w-full rounded-xl border border-border bg-bg p-3 font-mono text-xs text-slate-100 outline-none"
+                className="min-h-32 w-full rounded-xl border border-white/[0.08] bg-[#0c0d12]/50 p-3.5 font-mono text-xs text-slate-200 outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30 focus:shadow-glow-accent transition-all"
                 value={payloadText}
                 onChange={(e) => setPayloadText(e.target.value)}
               />
             </Field>
           )}
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
             <Button onClick={() => create.mutate()} disabled={create.isPending || !title.trim() || Boolean(previewState.error)}>
-              {create.isPending ? "Creating..." : "Create task"}
+              {create.isPending ? "Spawning Task..." : "Spawn Automation Task"}
             </Button>
-            <span className="text-xs text-muted">Recurring jobs keep the same payload metadata.</span>
+            <span className="text-[10px] font-mono text-slate-500">Recurrence templates are saved as immutable payloads.</span>
           </div>
 
-          {previewState.error ? (
-            <p className="text-sm text-red-300">{previewState.error}</p>
-          ) : (
-            <pre className="overflow-x-auto rounded-xl border border-border bg-bg p-3 text-[11px] text-slate-300">
-              {JSON.stringify(previewState.payload, null, 2)}
-            </pre>
-          )}
+          {/* Dual-pane Live JSON Validator Preview */}
+          <div className="space-y-1.5 pt-4">
+            <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Live Schema Validation Preview:</span>
+            {previewState.error ? (
+              <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3 text-xs text-rose-400 font-mono">
+                Payload format error: {previewState.error}
+              </div>
+            ) : (
+              <pre className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#040508] p-4 text-[11px] font-mono text-slate-400 leading-relaxed max-h-40">
+                {JSON.stringify(previewState.payload, null, 2)}
+              </pre>
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      <Card className="border-white/10 bg-slate-950/70">
-        <CardHeader>
-          <CardTitle className="text-white">Open tasks</CardTitle>
-          <CardDescription>Live queue, runs, failures, and completed jobs.</CardDescription>
+      {/* Live Automation Queue List */}
+      <Card className="border-white/[0.06] bg-slate-950/40 backdrop-blur-md shadow-2xl">
+        <CardHeader className="pb-2 border-b border-white/[0.06] bg-white/[0.01]">
+          <CardTitle className="text-base font-bold text-white font-sans">Active Automation Queue</CardTitle>
+          <CardDescription className="text-xs text-slate-400">
+            Pending queues, recurring triggers, execution hearts, and active cancellation hooks.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-0 overflow-hidden rounded-xl border border-border p-0">
-          <TableHead columns={["Title", "Kind", "State", "Scheduled", "Created", ""]} />
-          <div className="divide-y divide-border">
-            {tasks.map((t) => (
-              <div key={t.id} className="grid gap-3 px-4 py-3 text-sm text-white" style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}>
-                <div className="min-w-0 truncate">{t.title}</div>
-                <div className="min-w-0 truncate text-muted">{t.kind}</div>
-                <div className="min-w-0"><StatePill v={t.state} /></div>
-                <div className="min-w-0 truncate text-muted">{t.scheduled_at ? new Date(t.scheduled_at).toLocaleString() : "—"}</div>
-                <div className="min-w-0 truncate text-muted">{new Date(t.created_at).toLocaleString()}</div>
-                <div className="text-right">
-                  {!["completed", "failed", "cancelled"].includes(t.state) && (
-                    <button className="text-xs text-muted hover:text-red-400" onClick={() => cancel.mutate(t.id)}>
-                      Cancel
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-            {tasks.length === 0 && <EmptyRow message="No tasks yet." cols={6} />}
+        <CardContent className="px-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-white/[0.02] border-b border-white/[0.06] text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500">
+                <tr>
+                  <th className="p-4 text-left font-semibold">Task Title</th>
+                  <th className="p-4 text-left font-semibold">Trigger Kind</th>
+                  <th className="p-4 text-left font-semibold">Recurrence</th>
+                  <th className="p-4 text-left font-semibold">Queue State</th>
+                  <th className="p-4 text-left font-semibold">Scheduled Date</th>
+                  <th className="p-4 text-left font-semibold">Created Date</th>
+                  <th className="p-4 text-right font-semibold">Control</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {tasks.map((t) => (
+                  <tr key={t.id} className="hover:bg-white/[0.01] transition-all duration-150">
+                    <td className="p-4 font-semibold text-slate-200">{t.title}</td>
+                    <td className="p-4"><span className="text-xs font-mono text-slate-400">{t.kind}</span></td>
+                    <td className="p-4"><RecurrencePill payload={t.payload} /></td>
+                    <td className="p-4"><StatePill v={t.state} /></td>
+                    <td className="p-4 text-xs font-mono text-slate-400">{t.scheduled_at ? new Date(t.scheduled_at).toLocaleString() : "—"}</td>
+                    <td className="p-4 text-xs font-mono text-slate-400">{new Date(t.created_at).toLocaleString()}</td>
+                    <td className="p-4 text-right">
+                      {!["completed", "failed", "cancelled"].includes(t.state) && (
+                        <button className="text-xs font-semibold text-slate-500 hover:text-rose-400 transition-colors font-mono" onClick={() => cancel.mutate(t.id)}>
+                          [Cancel]
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {tasks.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-xs font-mono text-slate-500">
+                      No active automation tasks in queue. Use Builder Console to spawn one.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>
@@ -379,6 +428,30 @@ function StatePill({ v }: { v: string }) {
       } as Record<string, string>
     )[v] || "bg-neutral-700";
   return <span className={`inline-flex rounded px-2 py-0.5 text-xs ${color}`}>{v}</span>;
+}
+
+function RecurrencePill({ payload }: { payload: Record<string, unknown> }) {
+  const repeat = payload["_repeat_every_minutes"];
+  const until = payload["_repeat_until"];
+  const template = payload["_template"];
+  const parts = [
+    typeof repeat === "number" || typeof repeat === "string" ? `every ${repeat}m` : null,
+    typeof until === "string" && until ? `until ${new Date(until).toLocaleDateString()}` : null,
+    typeof template === "string" && template ? template : null,
+  ].filter(Boolean);
+  if (parts.length === 0) {
+    return <span className="text-xs font-mono text-slate-500">one-off</span>;
+  }
+  return <span className="text-xs font-mono text-slate-300">{parts.join(" · ")}</span>;
+}
+
+function InfoPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">{label}</div>
+      <div className="mt-1 text-sm font-medium text-slate-200">{value}</div>
+    </div>
+  );
 }
 
 function parseJson(text: string): Record<string, unknown> {

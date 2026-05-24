@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,12 +10,40 @@ from app.auth.deps import current_user, require_role
 from app.db import get_db
 from app.dispatcher import dispatch
 from app.events import publish
-from app.models import AuditLog, Skill, TaskState, User
+from app.models import AuditLog, Skill, SkillPreset, TaskState, User
 from app.schemas import SkillCreateIn, SkillOut, SkillPatchIn, SkillRunIn, SkillUpdateIn, TaskOut
 from app.skill_tasks import build_skill_task
 from app.skill_loader import sync_skill_catalog
 
 router = APIRouter(prefix="/v1/skills", tags=["skills"])
+
+
+class SkillPresetOut(SkillOut):
+    label: str
+
+
+class SkillPresetCreateIn(SkillUpdateIn):
+    label: str
+
+
+class SkillPresetIn(BaseModel):
+    label: str = Field(min_length=1)
+    version: str
+    description: str
+    permissions: list[str]
+    requires_approval: bool
+    enabled: bool
+    manifest: dict = Field(default_factory=dict)
+
+
+class SkillPresetBundleIn(BaseModel):
+    overwrite: bool = True
+    presets: list[SkillPresetIn] = Field(default_factory=list)
+
+
+class SkillPresetBundleOut(BaseModel):
+    name: str
+    presets: list[SkillPresetOut]
 
 
 async def _lookup_skill(db: AsyncSession, key: str):
@@ -27,6 +56,12 @@ async def _lookup_skill(db: AsyncSession, key: str):
     except ValueError:
         pass
     return (await db.execute(select(Skill).where(Skill.name == key))).scalar_one_or_none()
+
+
+async def _lookup_preset(db: AsyncSession, skill_id: UUID, label: str):
+    return (await db.execute(
+        select(SkillPreset).where(SkillPreset.skill_id == skill_id, SkillPreset.label == label)
+    )).scalar_one_or_none()
 
 
 @router.get("", response_model=list[SkillOut])
@@ -49,6 +84,208 @@ async def get_skill(
     if not skill:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
     return SkillOut.model_validate(skill)
+
+
+@router.get("/{skill_id}/presets", response_model=list[SkillPresetOut])
+async def list_skill_presets(
+    skill_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[User, Depends(current_user)],
+) -> list[SkillPresetOut]:
+    skill = await _lookup_skill(db, skill_id)
+    if not skill:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
+    rows = (await db.execute(
+        select(SkillPreset).where(SkillPreset.skill_id == skill.id).order_by(SkillPreset.updated_at.desc())
+    )).scalars().all()
+    return [
+        SkillPresetOut(
+            id=str(row.id),
+            name=skill.name,
+            version=row.version,
+            description=row.description,
+            permissions=list(row.permissions or []),
+            requires_approval=bool(row.requires_approval),
+            enabled=bool(row.enabled),
+            manifest=row.manifest or {},
+            label=row.label,
+        )
+        for row in rows
+    ]
+
+
+@router.get("/{skill_id}/presets/export", response_model=SkillPresetBundleOut)
+async def export_skill_presets(
+    skill_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _user: Annotated[User, Depends(current_user)],
+) -> SkillPresetBundleOut:
+    skill = await _lookup_skill(db, skill_id)
+    if not skill:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
+    rows = (await db.execute(
+        select(SkillPreset).where(SkillPreset.skill_id == skill.id).order_by(SkillPreset.updated_at.desc())
+    )).scalars().all()
+    return SkillPresetBundleOut(
+        name=skill.name,
+        presets=[
+            SkillPresetOut(
+                id=str(row.id),
+                name=skill.name,
+                version=row.version,
+                description=row.description,
+                permissions=list(row.permissions or []),
+                requires_approval=bool(row.requires_approval),
+                enabled=bool(row.enabled),
+                manifest=row.manifest or {},
+                label=row.label,
+            )
+            for row in rows
+        ],
+    )
+
+
+@router.put("/{skill_id}/presets/{label}", response_model=SkillPresetOut)
+async def save_skill_preset(
+    skill_id: str,
+    label: str,
+    body: SkillPresetCreateIn,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(require_role("admin"))],
+) -> SkillPresetOut:
+    skill = await _lookup_skill(db, skill_id)
+    if not skill:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
+    label = label.strip()
+    if not label:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "preset label required")
+    preset = await _lookup_preset(db, skill.id, label)
+    if not preset:
+        preset = SkillPreset(skill_id=skill.id, label=label)
+        db.add(preset)
+    preset.version = body.version
+    preset.description = body.description
+    preset.permissions = body.permissions
+    preset.requires_approval = body.requires_approval
+    preset.enabled = body.enabled
+    preset.manifest = {
+        **body.manifest,
+        "permissions": body.permissions,
+        "requires_approval": body.requires_approval,
+        "source": body.manifest.get("source", "manual"),
+    }
+    db.add(AuditLog(actor_id=user.id, action="skill.preset.save", target_kind="skill_preset", target_id=f"{skill.name}:{label}"))
+    await db.commit()
+    await db.refresh(preset)
+    return SkillPresetOut(
+        id=str(preset.id),
+        name=skill.name,
+        version=preset.version,
+        description=preset.description,
+        permissions=list(preset.permissions or []),
+        requires_approval=bool(preset.requires_approval),
+        enabled=bool(preset.enabled),
+        manifest=preset.manifest or {},
+        label=preset.label,
+    )
+
+
+@router.post("/{skill_id}/presets/import", response_model=SkillPresetBundleOut)
+async def import_skill_presets(
+    skill_id: str,
+    body: SkillPresetBundleIn,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(require_role("admin"))],
+) -> SkillPresetBundleOut:
+    skill = await _lookup_skill(db, skill_id)
+    if not skill:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
+    imported: list[SkillPresetOut] = []
+    for preset_body in body.presets:
+        label = preset_body.label.strip()
+        if not label:
+            continue
+        preset = await _lookup_preset(db, skill.id, label)
+        if not preset:
+            preset = SkillPreset(skill_id=skill.id, label=label)
+            db.add(preset)
+        elif not body.overwrite:
+            continue
+        preset.version = preset_body.version
+        preset.description = preset_body.description
+        preset.permissions = list(preset_body.permissions or [])
+        preset.requires_approval = bool(preset_body.requires_approval)
+        preset.enabled = bool(preset_body.enabled)
+        preset.manifest = {
+            **preset_body.manifest,
+            "permissions": preset_body.permissions,
+            "requires_approval": preset_body.requires_approval,
+            "source": preset_body.manifest.get("source", "manual"),
+        }
+        imported.append(
+            SkillPresetOut(
+                id=str(preset.id),
+                name=skill.name,
+                version=preset.version,
+                description=preset.description,
+                permissions=list(preset.permissions or []),
+                requires_approval=bool(preset.requires_approval),
+                enabled=bool(preset.enabled),
+                manifest=preset.manifest or {},
+                label=preset.label,
+            )
+        )
+    db.add(AuditLog(actor_id=user.id, action="skill.preset.import", target_kind="skill_preset", target_id=skill.name))
+    await db.commit()
+    return SkillPresetBundleOut(name=skill.name, presets=imported)
+
+
+@router.post("/{skill_id}/presets/{label}/apply", response_model=SkillOut)
+async def apply_skill_preset(
+    skill_id: str,
+    label: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(require_role("admin"))],
+) -> SkillOut:
+    skill = await _lookup_skill(db, skill_id)
+    if not skill:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
+    preset = await _lookup_preset(db, skill.id, label.strip())
+    if not preset:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "preset not found")
+    skill.version = preset.version
+    skill.description = preset.description
+    skill.permissions = list(preset.permissions or [])
+    skill.requires_approval = bool(preset.requires_approval)
+    skill.enabled = bool(preset.enabled)
+    skill.manifest = {
+        **(preset.manifest or {}),
+        "permissions": preset.permissions,
+        "requires_approval": preset.requires_approval,
+        "source": skill.manifest.get("source", "manual"),
+    }
+    db.add(AuditLog(actor_id=user.id, action="skill.preset.apply", target_kind="skill_preset", target_id=f"{skill.name}:{label}"))
+    await db.commit()
+    await db.refresh(skill)
+    return SkillOut.model_validate(skill)
+
+
+@router.delete("/{skill_id}/presets/{label}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_skill_preset(
+    skill_id: str,
+    label: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(require_role("admin"))],
+) -> None:
+    skill = await _lookup_skill(db, skill_id)
+    if not skill:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "skill not found")
+    preset = await _lookup_preset(db, skill.id, label.strip())
+    if not preset:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "preset not found")
+    await db.delete(preset)
+    db.add(AuditLog(actor_id=user.id, action="skill.preset.delete", target_kind="skill_preset", target_id=f"{skill.name}:{label}"))
+    await db.commit()
 
 
 @router.patch("/{skill_id}", response_model=SkillOut)

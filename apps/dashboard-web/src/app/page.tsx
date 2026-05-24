@@ -48,88 +48,110 @@ export default function Overview() {
   }, [nodes, tasks, approvals]);
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-border bg-panel p-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(124,92,255,0.18),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.10),transparent_30%)]" />
-        <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+    <div className="space-y-8">
+      {/* Premium Ambient Header Control Room Banner */}
+      <section className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-950/40 p-6 md:p-8 backdrop-blur-md">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(124,92,255,0.15),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.06),transparent_35%)]" />
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl">
-            <p className="text-xs uppercase tracking-[0.25em] text-muted">Control room</p>
-            <h1 className="mt-2 text-3xl font-semibold text-white">BuildAgent live dashboard</h1>
-            <p className="mt-3 text-sm text-muted leading-6">
-              Live node state, task flow, and approvals in one place. Use this to see what the system is doing right now.
+            <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-accent">Control Room</span>
+            <h1 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight text-white font-sans">
+              BuildAgent <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-indigo-400">Live Dashboard</span>
+            </h1>
+            <p className="mt-3 text-sm text-slate-400 leading-relaxed font-sans">
+              Real-time monitoring of node deployments, task orchestrations, and secure gatekeeper approvals.
+              Access live logs and audit trails from one unified terminal.
             </p>
           </div>
-          <div className="flex gap-2">
-            <Link className="rounded bg-accent px-4 py-2 text-sm font-medium text-white" href="/tasks">
+          <div className="flex gap-3 relative z-10 shrink-0">
+            <Link className="inline-flex h-10 items-center justify-center rounded-xl bg-gradient-to-r from-accent to-[#5d3bf2] px-5 py-2 text-sm font-semibold text-white shadow-lg hover:shadow-glow-accent hover:brightness-110 active:scale-[0.98] transition-all" href="/tasks">
               New task
             </Link>
-            <Link className="rounded border border-border bg-bg px-4 py-2 text-sm font-medium text-white" href="/nodes">
+            <Link className="inline-flex h-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] px-5 py-2 text-sm font-semibold text-slate-300 hover:bg-white/[0.06] hover:text-white transition-all" href="/nodes">
               View nodes
             </Link>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {/* Stats Dashboard Grid */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((stat) => (
           <StatCard key={stat.label} label={stat.label} value={stat.value} tone={stat.tone} />
         ))}
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-3">
-        <Panel title="Agent layer" href="/agents" cta="Open agents">
-          <TableHead columns={["Lane", "Live signal"]} />
-          <div className="divide-y divide-border">
-            <Row cols={["Planner", "Task queue + templates"]} />
-            <Row cols={["Executor", `${nodes.filter((n) => n.status === "online").length} nodes online`] } />
-            <Row cols={["Gatekeeper", `${approvals.filter((a) => a.state === "pending").length} approvals`] } />
-            <Row cols={["Router", "LiteLLM + skills"]} />
+      {/* Main 3-column Workspace Panels */}
+      <section className="grid gap-6 xl:grid-cols-3">
+        <Panel title="Agent Layer" href="/agents" cta="Open catalog">
+          <TableHead columns={["Lane", "Signal"]} />
+          <div className="divide-y divide-white/[0.04]">
+            <Row cols={[
+              <span key="lane" className="font-semibold text-slate-200">Planner</span>,
+              <span key="signal" className="text-xs font-mono text-slate-400">Task queue + templates</span>
+            ]} />
+            <Row cols={[
+              <span key="lane" className="font-semibold text-slate-200">Executor</span>,
+              <span key="signal" className="text-xs font-mono text-emerald-400 flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse status-glow-emerald" />{nodes.filter((n) => n.status === "online").length} nodes online</span>
+            ]} />
+            <Row cols={[
+              <span key="lane" className="font-semibold text-slate-200">Gatekeeper</span>,
+              <span key="signal" className="text-xs font-mono text-amber-400 flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse status-glow-amber" />{approvals.filter((a) => a.state === "pending").length} approvals</span>
+            ]} />
+            <Row cols={[
+              <span key="lane" className="font-semibold text-slate-200">Router</span>,
+              <span key="signal" className="text-xs font-mono text-slate-400">LiteLLM + skills</span>
+            ]} />
           </div>
         </Panel>
 
-        <Panel title="Recent tasks" href="/tasks" cta="Open tasks">
-          <TableHead columns={["Title", "Kind", "State", "Created"]} />
-          <div className="divide-y divide-border">
-            {tasks.slice(0, 6).map((task) => (
-              <Row key={task.id} cols={[task.title, task.kind, <StatePill key="state" v={task.state} />, new Date(task.created_at).toLocaleString()]} />
+        <Panel title="Recent Tasks" href="/tasks" cta="Open builder">
+          <TableHead columns={["Title", "Kind", "State"]} />
+          <div className="divide-y divide-white/[0.04]">
+            {tasks.slice(0, 5).map((task) => (
+              <Row key={task.id} cols={[
+                <div key="title" className="truncate font-medium text-slate-200">{task.title}</div>,
+                <span key="kind" className="text-xs font-mono text-slate-400">{task.kind}</span>,
+                <StatePill key="state" v={task.state} />
+              ]} />
             ))}
-            {tasks.length === 0 && <EmptyRow message="No tasks yet." cols={4} />}
+            {tasks.length === 0 && <EmptyRow message="No tasks created yet." cols={3} />}
           </div>
         </Panel>
 
-        <Panel title="Pending approvals" href="/approvals" cta="Open approvals">
-          <TableHead columns={["Action", "Risk", "State", "Created"]} />
-          <div className="divide-y divide-border">
-            {approvals.slice(0, 6).map((approval) => (
+        <Panel title="Gatekeeper Approvals" href="/approvals" cta="Open reviews">
+          <TableHead columns={["Action", "Risk", "State"]} />
+          <div className="divide-y divide-white/[0.04]">
+            {approvals.slice(0, 5).map((approval) => (
               <Row
                 key={approval.id}
                 cols={[
-                  approval.action,
+                  <div key="action" className="truncate font-medium text-slate-200">{approval.action}</div>,
                   <RiskPill key="risk" v={approval.risk} />,
-                  <StatePill key="state" v={approval.state} />,
-                  new Date(approval.created_at).toLocaleString(),
+                  <StatePill key="state" v={approval.state} />
                 ]}
               />
             ))}
-            {approvals.length === 0 && <EmptyRow message="No approvals waiting." cols={4} />}
+            {approvals.length === 0 && <EmptyRow message="No pending approvals." cols={3} />}
           </div>
         </Panel>
       </section>
 
-      <Panel title="Nodes" href="/nodes" cta="Open nodes">
-        <TableHead columns={["Name", "Status", "Last seen"]} />
-        <div className="divide-y divide-border">
-          {nodes.slice(0, 8).map((node) => (
+      {/* Fleet Nodes Panel */}
+      <Panel title="Active Nodes" href="/nodes" cta="Manage fleet">
+        <TableHead columns={["Node Name", "Status", "Last Seen"]} />
+        <div className="divide-y divide-white/[0.04]">
+          {nodes.slice(0, 6).map((node) => (
             <Row
               key={node.id}
               cols={[
-                node.name,
+                <span key="name" className="font-semibold text-slate-200">{node.name}</span>,
                 <StatePill key="state" v={node.status} />,
-                node.last_seen ? new Date(node.last_seen).toLocaleString() : "—",
+                <span key="seen" className="text-xs font-mono text-slate-400">{node.last_seen ? new Date(node.last_seen).toLocaleString() : "never"}</span>
               ]}
             />
           ))}
-          {nodes.length === 0 && <EmptyRow message="No nodes registered." cols={3} />}
+          {nodes.length === 0 && <EmptyRow message="No registered nodes in database." cols={3} />}
         </div>
       </Panel>
     </div>
@@ -148,11 +170,11 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-panel overflow-hidden">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-white">{title}</h2>
-        <Link className="text-xs text-muted hover:text-white" href={href}>
-          {cta}
+    <section className="rounded-2xl border border-white/[0.06] bg-slate-950/40 overflow-hidden shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-white/[0.1]">
+      <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3 bg-white/[0.01]">
+        <h2 className="text-sm font-semibold text-white tracking-wide">{title}</h2>
+        <Link className="text-xs text-slate-400 hover:text-accent font-medium transition-colors" href={href}>
+          {cta} &rarr;
         </Link>
       </div>
       <div className="overflow-x-auto">{children}</div>
@@ -162,16 +184,16 @@ function Panel({
 
 function StatCard({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
-    <div className="rounded-2xl border border-border bg-panel p-4">
-      <div className="text-xs uppercase tracking-[0.2em] text-muted">{label}</div>
-      <div className={`mt-2 text-3xl font-semibold ${tone}`}>{value}</div>
+    <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-950/40 p-5 backdrop-blur-md shadow-2xl transition-all duration-300 hover:border-white/[0.1] hover:bg-slate-950/50">
+      <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500">{label}</div>
+      <div className={`mt-2.5 text-3xl font-bold tracking-tight ${tone}`}>{value}</div>
     </div>
   );
 }
 
 function TableHead({ columns }: { columns: string[] }) {
   return (
-    <div className="grid gap-3 border-b border-border bg-bg/40 px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
+    <div className="grid gap-3 border-b border-white/[0.06] bg-white/[0.02] px-4 py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
       {columns.map((column) => (
         <div key={column}>{column}</div>
       ))}
@@ -181,7 +203,7 @@ function TableHead({ columns }: { columns: string[] }) {
 
 function Row({ cols }: { cols: React.ReactNode[] }) {
   return (
-    <div className="grid gap-3 px-4 py-3 text-sm text-white" style={{ gridTemplateColumns: `repeat(${cols.length}, minmax(0, 1fr))` }}>
+    <div className="grid gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-white/[0.02] transition-colors items-center" style={{ gridTemplateColumns: `repeat(${cols.length}, minmax(0, 1fr))` }}>
       {cols.map((col, idx) => (
         <div key={idx} className="min-w-0 truncate">
           {col}
@@ -193,32 +215,32 @@ function Row({ cols }: { cols: React.ReactNode[] }) {
 
 function EmptyRow({ message, cols }: { message: string; cols: number }) {
   return (
-    <div className="px-4 py-6 text-sm text-muted" style={{ gridColumn: `span ${cols}` }}>
+    <div className="px-4 py-6 text-xs text-slate-400 font-mono text-center" style={{ gridColumn: `span ${cols}` }}>
       {message}
     </div>
   );
 }
 
 function StatePill({ v }: { v: string }) {
-  const color = {
-    online: "bg-emerald-700",
-    degraded: "bg-yellow-700",
-    queued: "bg-indigo-700",
-    running: "bg-sky-700",
-    pending: "bg-yellow-700",
-    completed: "bg-emerald-700",
-    failed: "bg-red-700",
-    cancelled: "bg-neutral-700",
-  }[v] || "bg-neutral-700";
-  return <span className={`inline-flex rounded px-2 py-0.5 text-xs ${color}`}>{v}</span>;
+  const styles = ({
+    online: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.08)]",
+    completed: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.08)]",
+    degraded: "border-amber-500/20 bg-amber-500/10 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.08)]",
+    pending: "border-amber-500/20 bg-amber-500/10 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.08)]",
+    queued: "border-indigo-500/20 bg-indigo-500/10 text-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.08)]",
+    running: "border-sky-500/20 bg-sky-500/10 text-sky-400 shadow-[0_0_8px_rgba(14,165,233,0.1)] animate-pulse",
+    failed: "border-rose-500/20 bg-rose-500/10 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.08)]",
+    cancelled: "border-white/10 bg-white/5 text-slate-400",
+  } as Record<string, string>)[v] || "border-white/10 bg-white/5 text-slate-400";
+  return <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${styles}`}>{v}</span>;
 }
 
 function RiskPill({ v }: { v: string }) {
-  const color = {
-    low: "bg-neutral-700",
-    medium: "bg-yellow-700",
-    high: "bg-orange-700",
-    critical: "bg-red-700",
-  }[v] || "bg-neutral-700";
-  return <span className={`inline-flex rounded px-2 py-0.5 text-xs ${color}`}>{v}</span>;
+  const styles = ({
+    low: "border-white/10 bg-white/5 text-slate-400",
+    medium: "border-amber-500/20 bg-amber-500/10 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.08)]",
+    high: "border-orange-500/20 bg-orange-500/10 text-orange-400 shadow-[0_0_8px_rgba(249,115,22,0.08)]",
+    critical: "border-rose-500/20 bg-rose-500/10 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.1)] font-bold animate-pulse",
+  } as Record<string, string>)[v] || "border-white/10 bg-white/5 text-slate-400";
+  return <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${styles}`}>{v}</span>;
 }

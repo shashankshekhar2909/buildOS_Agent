@@ -19,7 +19,9 @@ dependencies = [
     "python-multipart>=0.0.12",
     "cryptography>=44",
     "openai>=1.54",
+    "google-genai>=1.0.0",
     "pgvector>=0.3",
+    "paramiko>=3.5",
 ]
 
 [build-system]

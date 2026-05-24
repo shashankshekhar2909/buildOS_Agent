@@ -5,15 +5,16 @@ import os
 from openai import AsyncOpenAI
 
 from app.config import get_settings
+from app.llm_store import default_embedding_model, litellm_master_key
 
 
 def _client() -> AsyncOpenAI:
     settings = get_settings()
-    return AsyncOpenAI(base_url=settings.litellm_url, api_key=settings.litellm_master_key)
+    return AsyncOpenAI(base_url=settings.litellm_url, api_key=litellm_master_key())
 
 
 def embedding_model() -> str:
-    return os.environ.get("EMBEDDING_MODEL", "embed-small")
+    return default_embedding_model() or os.environ.get("EMBEDDING_MODEL", "embed-small")
 
 
 async def embed(texts: list[str]) -> list[list[float]]:

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Task, TaskState
 from app.events import publish
+from app.node_store import get_node_ssh_payload
 from app.connector_store import get_user_secret
 from app.skill_runtime import normalize_payload, run_skill
 from app.task_recurrence import spawn_repeat_task
@@ -48,6 +49,17 @@ async def dispatch(db: AsyncSession, task: Task) -> None:
                 if skill_name == "slack" and not merged.get("channel_id") and user_secret.get("default_channel_id"):
                     merged["channel_id"] = user_secret.get("default_channel_id")
                 skill_payload = merged
+        if skill_name == "ssh":
+            node_id = skill_payload.get("node_id")
+            if node_id:
+                try:
+                    node_payload = await get_node_ssh_payload(db, node_id)
+                except Exception:
+                    node_payload = None
+                if node_payload:
+                    merged = dict(node_payload)
+                    merged.update({k: v for k, v in skill_payload.items() if v not in (None, "")})
+                    skill_payload = merged
 
         task.state = TaskState.running
         task.started_at = datetime.now(tz=timezone.utc)

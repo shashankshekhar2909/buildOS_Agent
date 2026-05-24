@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { API_URL, api, getToken } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ type Skill = {
   enabled: boolean;
   manifest: Record<string, unknown>;
 };
+type SkillPreset = Skill & { label: string };
 
 type Task = {
   id: string;
@@ -31,6 +32,16 @@ type Task = {
   result: Record<string, unknown>;
   error: string | null;
   created_at: string;
+};
+
+type Node = {
+  id: string;
+  name: string;
+  ssh_host: string | null;
+  ssh_user: string | null;
+  ssh_port: number | null;
+  ssh_auth_type: string | null;
+  ssh_configured: boolean;
 };
 
 type GmailConfig = {
@@ -71,6 +82,7 @@ const WHATSAPP_KEY = "buildagent.whatsapp";
 
 export default function SkillDetailPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const id = params.id;
   const router = useRouter();
   const qc = useQueryClient();
@@ -118,6 +130,10 @@ export default function SkillDetailPage() {
   const [slackMessage, setSlackMessage] = useState("Hello from BuildAgent");
   const [slackLimit, setSlackLimit] = useState("20");
   const [slackCursor, setSlackCursor] = useState("");
+  const [sshNodeId, setSshNodeId] = useState("");
+  const [sshCommand, setSshCommand] = useState("hostname");
+  const [sshTimeout, setSshTimeout] = useState("60");
+  const [sshPty, setSshPty] = useState(false);
 
   const meQ = useQuery<Me>({
     queryKey: ["me"],
@@ -128,6 +144,24 @@ export default function SkillDetailPage() {
   const skillQ = useQuery<Skill>({
     queryKey: ["skill", id],
     queryFn: () => api<Skill>(`/v1/skills/${id}`),
+    retry: false,
+  });
+  const presetsQ = useQuery<SkillPreset[]>({
+    queryKey: ["skill-presets", id],
+    queryFn: () => api<SkillPreset[]>(`/v1/skills/${id}/presets`),
+    enabled: Boolean(skillQ.data?.id),
+    retry: false,
+  });
+  const [presetLabel, setPresetLabel] = useState("baseline");
+  const [presetImportText, setPresetImportText] = useState("");
+  const [presetImportFile, setPresetImportFile] = useState("");
+  const [presetImportOverwrite, setPresetImportOverwrite] = useState(true);
+  const [presetImportError, setPresetImportError] = useState<string | null>(null);
+
+  const nodesQ = useQuery<Node[]>({
+    queryKey: ["nodes"],
+    queryFn: () => api<Node[]>("/v1/nodes"),
+    enabled: skillQ.data?.name === "ssh",
     retry: false,
   });
 
@@ -164,6 +198,78 @@ export default function SkillDetailPage() {
       qc.invalidateQueries({ queryKey: ["skills"] });
       qc.invalidateQueries({ queryKey: ["audit"] });
       router.push("/skills");
+    },
+  });
+
+  const savePreset = useMutation({
+    mutationFn: () =>
+      api<SkillPreset>(`/v1/skills/${id}/presets/${encodeURIComponent(presetLabel.trim())}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          label: presetLabel.trim(),
+          name: skill?.name || "",
+          version: skill?.version || "0.1.0",
+          description: skill?.description || "",
+          permissions: skill?.permissions || [],
+          requires_approval: skill?.requires_approval ?? true,
+          enabled: skill?.enabled ?? true,
+          manifest: skill?.manifest || {},
+        }),
+      }),
+    onSuccess: () => presetsQ.refetch(),
+  });
+
+  const applyPreset = useMutation({
+    mutationFn: (label: string) => api<Skill>(`/v1/skills/${id}/presets/${encodeURIComponent(label)}/apply`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["skills"] });
+      qc.invalidateQueries({ queryKey: ["skill", id] });
+      presetsQ.refetch();
+    },
+  });
+
+  const deletePreset = useMutation({
+    mutationFn: (label: string) => api<void>(`/v1/skills/${id}/presets/${encodeURIComponent(label)}`, { method: "DELETE" }),
+    onSuccess: () => presetsQ.refetch(),
+  });
+
+  const exportPresets = useMutation({
+    mutationFn: async () => {
+      const token = getToken();
+      const res = await fetch(`${API_URL}/v1/skills/${id}/presets/export`, {
+        headers: token ? { authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return (await res.json()) as { name: string; presets: SkillPreset[] };
+    },
+    onSuccess: (bundle) => {
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `skill-presets-${bundle.name}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+
+  const importPresets = useMutation({
+    mutationFn: async () => {
+      setPresetImportError(null);
+      const parsed = JSON.parse(presetImportText) as { presets?: SkillPreset[]; [key: string]: unknown } | SkillPreset[];
+      const bundle = Array.isArray(parsed) ? { presets: parsed } : parsed;
+      return api<{ name: string; presets: SkillPreset[] }>(`/v1/skills/${id}/presets/import`, {
+        method: "POST",
+        body: JSON.stringify({ ...bundle, overwrite: presetImportOverwrite }),
+      });
+    },
+    onSuccess: () => {
+      presetsQ.refetch();
+      setPresetImportText("");
+      setPresetImportFile("");
+    },
+    onError: (err) => {
+      setPresetImportError(err instanceof Error ? err.message : "import failed");
     },
   });
 
@@ -233,6 +339,13 @@ export default function SkillDetailPage() {
   const isWhatsApp = skill?.name === "whatsapp";
   const isTelegram = skill?.name === "telegram";
   const isSlack = skill?.name === "slack";
+  const isSsh = skill?.name === "ssh";
+
+  useEffect(() => {
+    if (!isSsh) return;
+    const node = searchParams.get("node");
+    if (node) setSshNodeId(node);
+  }, [isSsh, searchParams]);
 
   const gmailPayload = useMemo(() => {
     if (!isGmail) return null;
@@ -322,9 +435,26 @@ export default function SkillDetailPage() {
     return payload;
   }, [isSlack, slackChannelId, slackCursor, slackDefaultChannelId, slackLimit, slackMessage, slackOp, slackQ.data?.default_channel_id, slackQ.data?.registered, slackToken]);
 
+  const sshPayload = useMemo(() => {
+    if (!isSsh) return null;
+    return {
+      op: "exec",
+      node_id: sshNodeId || null,
+      command: sshCommand,
+      timeout: Number(sshTimeout) || 60,
+      pty: sshPty,
+    };
+  }, [isSsh, sshCommand, sshNodeId, sshPty, sshTimeout]);
+
   const runSkill = useMutation({
     mutationFn: async () => {
-      const payload: Record<string, unknown> = isGmail && gmailPayload ? gmailPayload : isCalendar && calendarPayload ? calendarPayload : isWhatsApp && whatsappPayload ? whatsappPayload : isTelegram && telegramPayload ? telegramPayload : isSlack && slackPayload ? slackPayload : parsePayload(payloadText);
+      const payload: Record<string, unknown> = isGmail && gmailPayload ? gmailPayload
+        : isCalendar && calendarPayload ? calendarPayload
+        : isWhatsApp && whatsappPayload ? whatsappPayload
+        : isTelegram && telegramPayload ? telegramPayload
+        : isSlack && slackPayload ? slackPayload
+        : isSsh && sshPayload ? sshPayload
+        : parsePayload(payloadText);
       return api<Task>(`/v1/skills/${id}/run`, {
         method: "POST",
         body: JSON.stringify({ payload }),
@@ -412,6 +542,26 @@ export default function SkillDetailPage() {
           <p className="text-xs uppercase tracking-[0.25em] text-muted">Skill detail</p>
           <h1 className="mt-2 text-3xl font-semibold text-white">{skill?.name ?? "Loading..."}</h1>
           <p className="mt-2 text-sm text-muted">Single skill view with manifest, source, and admin controls.</p>
+          {skill && (
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <div className="rounded-xl border border-border bg-panel px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-muted">Preset count</div>
+                <div className="mt-1 text-lg font-semibold text-white">{String(presetsQ.data?.length ?? 0)}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-panel px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-muted">Preset mode</div>
+                <div className="mt-1 text-lg font-semibold text-white">{skill.manifest?.source === "manual" ? "manual" : "file"}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-panel px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-muted">Approval</div>
+                <div className="mt-1 text-lg font-semibold text-white">{skill.requires_approval ? "gated" : "open"}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-panel px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-muted">Selected</div>
+                <div className="mt-1 text-lg font-semibold text-white">{skill.name}</div>
+              </div>
+            </div>
+          )}
         </div>
         <Link href="/skills" className="rounded border border-border bg-bg px-4 py-2 text-sm font-medium text-white">
           Back to catalog
@@ -421,7 +571,7 @@ export default function SkillDetailPage() {
       {!skill && <Card className="border-white/10 bg-slate-950/70"><CardContent className="p-6 text-sm text-muted">Loading skill...</CardContent></Card>}
 
       {skill && (
-        <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr]">
+      <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr]">
           <Card className="border-white/10 bg-slate-950/70">
             <CardHeader>
               <CardTitle className="text-white">{skill.name}</CardTitle>
@@ -470,6 +620,8 @@ export default function SkillDetailPage() {
                         ? "Register your own Slack bot once, then send or inspect messages without sharing creds."
                       : isWhatsApp
                         ? "Connect WhatsApp once, then send text messages without hand-editing JSON."
+                      : isSsh
+                        ? "Pick a saved node, then run a remote command with the stored SSH host and auth."
                     : "Send JSON payload to the live skill handler. Approvals still apply if required."}
                 </CardDescription>
               </CardHeader>
@@ -1008,6 +1160,72 @@ export default function SkillDetailPage() {
                       </div>
                     </div>
                   </div>
+                ) : isSsh ? (
+                  <div className="space-y-4">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-[0.2em] text-muted">Node</label>
+                        <select
+                          className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+                          value={sshNodeId}
+                          onChange={(e) => setSshNodeId(e.target.value)}
+                        >
+                          <option value="">Select node</option>
+                          {(nodesQ.data ?? []).map((node) => (
+                            <option key={node.id} value={node.id}>
+                              {node.name}
+                              {node.ssh_host ? ` (${node.ssh_user ? `${node.ssh_user}@` : ""}${node.ssh_host}:${node.ssh_port ?? 22})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-[0.2em] text-muted">Timeout seconds</label>
+                        <input
+                          className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+                          type="number"
+                          min={1}
+                          max={600}
+                          value={sshTimeout}
+                          onChange={(e) => setSshTimeout(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-[0.2em] text-muted">Command</label>
+                        <input
+                          className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+                          placeholder="hostname"
+                          value={sshCommand}
+                          onChange={(e) => setSshCommand(e.target.value)}
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
+                        <input
+                          type="checkbox"
+                          checked={sshPty}
+                          onChange={(e) => setSshPty(e.target.checked)}
+                        />
+                        Allocate PTY
+                      </label>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-panel p-4 space-y-3">
+                      <div className="text-xs uppercase tracking-[0.2em] text-muted">SSH target</div>
+                      <div className="text-sm text-slate-200">
+                        {sshNodeId
+                          ? nodesQ.data?.find((node) => node.id === sshNodeId)
+                            ? `${nodesQ.data.find((node) => node.id === sshNodeId)?.name}`
+                            : "Selected node"
+                          : "Pick a node from the fleet"}
+                      </div>
+                      <p className="text-xs text-muted">
+                        Host, user, port, and SSH secret come from the node record. Password or key is stored server-side.
+                      </p>
+                    </div>
+                  </div>
                 ) : (
                   <textarea
                     className="min-h-40 w-full rounded-xl border border-border bg-bg p-3 font-mono text-xs text-slate-200 outline-none"
@@ -1025,29 +1243,19 @@ export default function SkillDetailPage() {
                   <span className="text-xs text-muted">Need admin or operator role.</span>
                 </div>
                 {isGmail && (
-                  <pre className="overflow-x-auto rounded-xl border border-border bg-bg p-3 text-[11px] text-slate-300">
-                    {JSON.stringify(gmailPayload, null, 2)}
-                  </pre>
+                  <DataTable title="Gmail payload" data={gmailPayload} />
                 )}
                 {isCalendar && (
-                  <pre className="overflow-x-auto rounded-xl border border-border bg-bg p-3 text-[11px] text-slate-300">
-                    {JSON.stringify(calendarPayload, null, 2)}
-                  </pre>
+                  <DataTable title="Calendar payload" data={calendarPayload} />
                 )}
                 {isWhatsApp && (
-                  <pre className="overflow-x-auto rounded-xl border border-border bg-bg p-3 text-[11px] text-slate-300">
-                    {JSON.stringify(whatsappPayload, null, 2)}
-                  </pre>
+                  <DataTable title="WhatsApp payload" data={whatsappPayload} />
                 )}
                 {isTelegram && (
-                  <pre className="overflow-x-auto rounded-xl border border-border bg-bg p-3 text-[11px] text-slate-300">
-                    {JSON.stringify(telegramPayload, null, 2)}
-                  </pre>
+                  <DataTable title="Telegram payload" data={telegramPayload} />
                 )}
                 {isSlack && (
-                  <pre className="overflow-x-auto rounded-xl border border-border bg-bg p-3 text-[11px] text-slate-300">
-                    {JSON.stringify(slackPayload, null, 2)}
-                  </pre>
+                  <DataTable title="Slack payload" data={slackPayload} />
                 )}
                 {runSkill.isError && <p className="text-sm text-red-300">{String(runSkill.error)}</p>}
                 {runTask && (
@@ -1057,9 +1265,7 @@ export default function SkillDetailPage() {
                       <Badge variant="secondary">{runTask.id}</Badge>
                     </div>
                     {runTask.error && <p className="text-red-300">{runTask.error}</p>}
-                    <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-bg p-3 text-xs text-slate-300">
-                      {JSON.stringify(runTask.result, null, 2)}
-                    </pre>
+                    <DataTable title="Task result" data={runTask.result} accent />
                   </div>
                 )}
               </CardContent>
@@ -1071,14 +1277,112 @@ export default function SkillDetailPage() {
                 <CardDescription>Raw manifest JSON as stored in the catalog.</CardDescription>
               </CardHeader>
               <CardContent>
-                <pre className="overflow-x-auto rounded-xl border border-border bg-bg p-4 text-xs text-slate-300">
-                  {JSON.stringify(skill.manifest, null, 2)}
-                </pre>
+                <DataTable title="Manifest" data={skill.manifest} />
               </CardContent>
             </Card>
           </div>
         </div>
       )}
+
+      <section className="rounded-2xl border border-border bg-panel overflow-hidden">
+        <div className="border-b border-border px-4 py-3 text-sm font-semibold text-white">Skill presets</div>
+        <div className="p-4 space-y-4">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-48">
+              <label className="flex flex-col gap-2 text-xs uppercase tracking-[0.15em] text-muted">
+                Preset label
+                <input
+                  className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+                  value={presetLabel}
+                  onChange={(e) => setPresetLabel(e.target.value)}
+                  placeholder="baseline"
+                />
+              </label>
+            </div>
+            <Button onClick={() => savePreset.mutate()} disabled={!isAdmin || !skill || !presetLabel.trim() || savePreset.isPending}>
+              Save preset
+            </Button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {(presetsQ.data ?? []).map((preset) => (
+              <div key={preset.id} className="rounded-xl border border-border bg-bg/40 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold text-white">{preset.label}</div>
+                  <Badge variant="outline">{preset.enabled ? "on" : "off"}</Badge>
+                </div>
+                <div className="mt-2 text-xs text-muted">
+                  {preset.version} · {preset.permissions.length} perms
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => applyPreset.mutate(preset.label)} disabled={!isAdmin || applyPreset.isPending}>
+                    Apply
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => deletePreset.mutate(preset.label)} disabled={!isAdmin || deletePreset.isPending}>
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {(presetsQ.data?.length ?? 0) === 0 && (
+              <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-sm text-muted md:col-span-2">
+                No skill presets saved yet.
+              </div>
+            )}
+          </div>
+          <div className="rounded-xl border border-border bg-bg/30 p-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold text-white">Import / export</div>
+                <div className="text-xs text-muted">Download the bundle or paste a JSON export to restore it.</div>
+              </div>
+              <Button variant="outline" onClick={() => exportPresets.mutate()} disabled={!isAdmin || !skill || exportPresets.isPending}>
+                Export JSON
+              </Button>
+            </div>
+            <textarea
+              className="min-h-32 w-full rounded-xl border border-border bg-bg p-3 text-xs font-mono text-slate-200 outline-none"
+              placeholder='{"presets":[{"label":"baseline","version":"0.1.0","description":"...","permissions":[],"requires_approval":true,"enabled":true,"manifest":{}}]}'
+              value={presetImportText}
+              onChange={(e) => setPresetImportText(e.target.value)}
+              disabled={!isAdmin || !skill}
+            />
+            <input
+              type="file"
+              accept="application/json,.json"
+              className="block w-full text-xs text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-accent file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-accent-hover"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setPresetImportFile(file.name);
+                const reader = new FileReader();
+                reader.onload = () => setPresetImportText(String(reader.result ?? ""));
+                reader.readAsText(file);
+              }}
+              disabled={!isAdmin || !skill}
+            />
+            {presetImportFile && <div className="text-[10px] font-mono text-muted">file: {presetImportFile}</div>}
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  checked={presetImportOverwrite}
+                  onChange={(e) => setPresetImportOverwrite(e.target.checked)}
+                  disabled={!isAdmin || !skill}
+                />
+                Overwrite existing
+              </label>
+              <Button
+                variant="outline"
+                onClick={() => importPresets.mutate()}
+                disabled={!isAdmin || !skill || !presetImportText.trim() || importPresets.isPending}
+              >
+                Import presets
+              </Button>
+              {presetImportError && <span className="text-xs text-rose-400">{presetImportError}</span>}
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -1090,6 +1394,40 @@ function Meta({ label, value }: { label: string; value: string }) {
       <span className="max-w-[70%] truncate text-right text-slate-100">{value}</span>
     </div>
   );
+}
+
+function DataTable({ title, data, accent = false }: { title: string; data: unknown; accent?: boolean }) {
+  const entries = toEntries(data);
+  return (
+    <div className="rounded-xl border border-border bg-bg">
+      <div className="border-b border-border px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-muted">{title}</div>
+      {entries.length === 0 ? (
+        <div className="px-3 py-4 text-sm text-slate-400">No fields.</div>
+      ) : (
+        <div className="divide-y divide-border">
+          {entries.map(([key, value]) => (
+            <div key={key} className="grid grid-cols-[180px,1fr] gap-3 px-3 py-2 text-xs">
+              <div className="font-mono uppercase tracking-[0.2em] text-slate-500 break-all">{key}</div>
+              <div className={`font-mono break-words ${accent ? "text-emerald-200" : "text-slate-200"}`}>{formatField(value)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function toEntries(data: unknown): Array<[string, unknown]> {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return [];
+  return Object.entries(data as Record<string, unknown>);
+}
+
+function formatField(value: unknown): string {
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value);
 }
 
 function parsePayload(text: string): Record<string, unknown> {

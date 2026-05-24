@@ -98,6 +98,12 @@ export default function AgentRunDetail() {
               {run.stop_reason && <span>stop: {run.stop_reason}</span>}
               <span>· {new Date(run.created_at).toLocaleString()}</span>
             </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <Info label="Skills" value={run.skills?.length ? run.skills.join(", ") : "none"} />
+              <Info label="Steps" value={String(run.steps?.length ?? 0)} />
+              <Info label="Messages" value={String(run.messages?.length ?? 0)} />
+              <Info label="Pending" value={run.pending_tool?.tool ?? "none"} />
+            </div>
           </div>
           <Link href="/agent-runs" className="text-xs text-muted hover:text-white">← back</Link>
         </div>
@@ -141,7 +147,7 @@ export default function AgentRunDetail() {
             <CardTitle className="text-sm">Output</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="whitespace-pre-wrap rounded-lg border border-border bg-bg p-3 text-sm">{run.output}</pre>
+            <ResultView value={run.output} />
           </CardContent>
         </Card>
       )}
@@ -172,8 +178,8 @@ export default function AgentRunDetail() {
                 {s.error && <Badge className="bg-red-700">err</Badge>}
               </div>
               <div className="grid gap-2 lg:grid-cols-2">
-                <pre className="overflow-x-auto text-muted">{JSON.stringify(s.arguments, null, 2)}</pre>
-                <pre className="overflow-x-auto text-emerald-300">{JSON.stringify(s.result ?? s.error, null, 2)}</pre>
+                <ResultView value={s.arguments} />
+                <ResultView value={s.result ?? s.error} accent />
               </div>
             </div>
           ))}
@@ -188,4 +194,49 @@ export default function AgentRunDetail() {
       </details>
     </div>
   );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-bg/50 px-3 py-2">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-muted">{label}</div>
+      <div className="mt-1 text-sm text-white break-words">{value}</div>
+    </div>
+  );
+}
+
+function ResultView({ value, accent = false }: { value: unknown; accent?: boolean }) {
+  if (value === null || value === undefined) {
+    return <div className="text-muted">—</div>;
+  }
+  if (typeof value === "string") {
+    return <pre className={`overflow-x-auto whitespace-pre-wrap rounded-lg border border-border bg-bg p-3 ${accent ? "text-emerald-300" : "text-muted"}`}>{value}</pre>;
+  }
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return <div className="text-muted">empty object</div>;
+    return (
+      <div className="overflow-hidden rounded-lg border border-border bg-bg">
+        {entries.map(([key, entryValue]) => (
+          <div key={key} className="grid grid-cols-[180px,1fr] gap-3 border-b border-border px-3 py-2 last:border-b-0">
+            <div className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted break-all">{key}</div>
+            <div className={`min-w-0 break-words font-mono text-[11px] ${accent ? "text-emerald-200" : "text-slate-200"}`}>
+              {formatValue(entryValue)}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (Array.isArray(value)) {
+    return <pre className={`overflow-x-auto rounded-lg border border-border bg-bg p-3 text-xs ${accent ? "text-emerald-300" : "text-muted"}`}>{JSON.stringify(value, null, 2)}</pre>;
+  }
+  return <div className={accent ? "text-emerald-300" : "text-muted"}>{String(value)}</div>;
+}
+
+function formatValue(value: unknown): string {
+  if (value === null) return "null";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value);
 }

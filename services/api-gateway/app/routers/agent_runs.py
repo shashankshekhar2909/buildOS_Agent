@@ -7,9 +7,12 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.deps import current_user
+from datetime import datetime, timezone
+
+from app.auth.deps import current_user, require_role
 from app.db import get_db
-from app.models import AgentRun, User
+from app.events import publish
+from app.models import AgentRun, AgentRunState, Approval, ApprovalState, AuditLog, User
 
 router = APIRouter(prefix="/v1/agent-runs", tags=["agent-runs"])
 

@@ -1,7 +1,7 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import current_user
@@ -33,11 +33,14 @@ async def _issue_pair(user: User, family: str | None = None) -> TokenPair:
 
 @router.post("/register", response_model=TokenPair, status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterIn, db: Annotated[AsyncSession, Depends(get_db)]) -> TokenPair:
-    exists = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+    email = body.email.strip().lower()
+    total = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+    if total > 0:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "registration is admin-managed")
+    exists = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
     if exists:
         raise HTTPException(status.HTTP_409_CONFLICT, "email already registered")
-    role = "admin" if (await db.execute(select(User))).first() is None else "viewer"
-    user = User(email=body.email, password_hash=hash_password(body.password), role=role)
+    user = User(email=email, password_hash=hash_password(body.password), role="admin")
     db.add(user)
     await db.commit()
     return await _issue_pair(user)
@@ -45,7 +48,8 @@ async def register(body: RegisterIn, db: Annotated[AsyncSession, Depends(get_db)
 
 @router.post("/login", response_model=TokenPair)
 async def login(body: LoginIn, db: Annotated[AsyncSession, Depends(get_db)]) -> TokenPair:
-    user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+    email = body.email.strip().lower()
+    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "bad credentials")
     return await _issue_pair(user)

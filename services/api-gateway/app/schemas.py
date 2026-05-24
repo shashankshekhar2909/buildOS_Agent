@@ -32,11 +32,36 @@ class UserOut(BaseModel):
         from_attributes = True
 
 
+class UserAdminOut(UserOut):
+    created_at: datetime
+
+
+class UserCreateIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+    role: str = "viewer"
+    is_active: bool = True
+
+
+class UserUpdateIn(BaseModel):
+    email: EmailStr | None = None
+    password: str | None = Field(default=None, min_length=8)
+    role: str | None = None
+    is_active: bool | None = None
+
+
 class NodeIn(BaseModel):
     name: str
     tags: list[str] = []
     status: str = "offline"
     capabilities: dict = {}
+    ssh_host: str | None = None
+    ssh_user: str | None = None
+    ssh_port: int | None = 22
+    ssh_auth_type: str | None = "password"
+    ssh_password: str | None = None
+    ssh_private_key: str | None = None
+    ssh_known_hosts: str | None = None
 
 
 class NodeUpdateIn(BaseModel):
@@ -44,6 +69,13 @@ class NodeUpdateIn(BaseModel):
     tags: list[str] | None = None
     status: str | None = None
     capabilities: dict | None = None
+    ssh_host: str | None = None
+    ssh_user: str | None = None
+    ssh_port: int | None = None
+    ssh_auth_type: str | None = None
+    ssh_password: str | None = None
+    ssh_private_key: str | None = None
+    ssh_known_hosts: str | None = None
 
 
 class NodeOut(BaseModel):
@@ -52,6 +84,11 @@ class NodeOut(BaseModel):
     status: str
     tags: list[str]
     capabilities: dict
+    ssh_host: str | None = None
+    ssh_user: str | None = None
+    ssh_port: int | None = None
+    ssh_auth_type: str | None = None
+    ssh_configured: bool = False
     last_metrics: dict
     last_seen: datetime | None
     created_at: datetime
@@ -83,6 +120,9 @@ class TaskOut(BaseModel):
     payload: dict
     state: TaskState
     node_id: UUID | None
+    scheduled_at: datetime | None
+    started_at: datetime | None
+    finished_at: datetime | None
     result: dict
     error: str | None
     created_at: datetime

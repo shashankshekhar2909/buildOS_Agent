@@ -38,6 +38,10 @@ def require_role(*roles: str):
     return _dep
 
 
+def require_admin():
+    return require_role("admin")
+
+
 def require_internal_token(x_internal_token: Annotated[str | None, Header()] = None) -> None:
     s = get_settings()
     if not x_internal_token or x_internal_token != s.internal_service_token:

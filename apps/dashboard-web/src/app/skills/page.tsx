@@ -21,6 +21,7 @@ type Skill = {
   enabled: boolean;
   manifest: Record<string, unknown>;
 };
+type SkillPreset = Skill & { label: string };
 
 type SkillForm = {
   name: string;
@@ -72,6 +73,12 @@ export default function SkillsPage() {
   const granted = grantsQ.data ?? [];
   const isAdmin = meQ.data?.role === "admin";
   const editingSkill = skills.find((skill) => skill.id === editingId) ?? null;
+  const selectedPresetsQ = useQuery<SkillPreset[]>({
+    queryKey: ["skill-presets", editingId],
+    queryFn: () => api<SkillPreset[]>(`/v1/skills/${editingId}/presets`),
+    enabled: !!editingId && isAuthed,
+    retry: false,
+  });
 
   const createSkill = useMutation({
     mutationFn: (body: SkillForm) =>
@@ -177,6 +184,13 @@ export default function SkillsPage() {
         {stats.map((item) => (
           <Metric key={item.label} label={item.label} value={item.value} />
         ))}
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-4">
+        <Metric label="Preset count" value={String(selectedPresetsQ.data?.length ?? 0)} />
+        <Metric label="Selected skill" value={editingSkill?.name || "none"} />
+        <Metric label="Preset mode" value={editingSkill ? (editingSkill.manifest?.source === "manual" ? "manual" : "file") : "idle"} />
+        <Metric label="Approval state" value={editingSkill?.requires_approval ? "gated" : "open"} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1fr_1.3fr]">
@@ -309,6 +323,31 @@ export default function SkillsPage() {
             </div>
           </CardContent>
         </Card>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-panel overflow-hidden">
+        <div className="border-b border-border px-4 py-3 text-sm font-semibold text-white">Selected skill presets</div>
+        <div className="p-4 space-y-3">
+          {!editingSkill && <Empty message="Pick a skill to view or manage presets." />}
+          {editingSkill && (
+            <div className="grid gap-3 md:grid-cols-2">
+              {(selectedPresetsQ.data ?? []).map((preset) => (
+                <div key={preset.id} className="rounded-xl border border-border bg-bg/40 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-white">{preset.label}</div>
+                    <Badge variant="outline">{preset.enabled ? "on" : "off"}</Badge>
+                  </div>
+                  <div className="mt-2 text-xs text-muted">{preset.version} · {preset.permissions.length} perms</div>
+                </div>
+              ))}
+              {(selectedPresetsQ.data?.length ?? 0) === 0 && (
+                <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-sm text-muted md:col-span-2">
+                  No presets saved for this skill yet.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

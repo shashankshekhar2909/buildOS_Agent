@@ -113,14 +113,14 @@ export default function MessagesPage() {
       <div>
         <p className="text-xs uppercase tracking-[0.25em] text-muted">Messages</p>
         <h1 className="mt-2 text-3xl font-semibold text-white">Messaging hub</h1>
-        <p className="mt-2 text-sm text-muted">Register each bot once per user. Secrets stay server-side.</p>
+        <p className="mt-2 text-sm text-muted">Register each bot once per user. Secrets stay server-side and are isolated by account.</p>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ConnectorCard
           title="Telegram"
           description="Register a bot token and default chat for this user."
-          status={telegramQ.data?.registered ? `@${telegramQ.data.bot_username ?? "bot"}` : "Not registered"}
+          status={telegramQ.data?.registered ? `Registered for ${meQ.data?.email ?? "this user"}` : "Not registered"}
           badge={telegramQ.data?.registered ? "live" : "empty"}
           action={
             <Link href="/skills" className="text-xs text-muted hover:text-white">
@@ -149,10 +149,10 @@ export default function MessagesPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => saveTelegram.mutate()} disabled={saveTelegram.isPending || !telegramToken.trim()}>
-              Save
+              Save bot
             </Button>
             <Button variant="ghost" onClick={() => clearTelegram.mutate()} disabled={clearTelegram.isPending || !telegramQ.data?.registered}>
-              Clear
+              Remove
             </Button>
           </div>
         </ConnectorCard>
@@ -160,7 +160,7 @@ export default function MessagesPage() {
         <ConnectorCard
           title="Slack"
           description="Register a bot token and default channel for this user."
-          status={slackQ.data?.registered ? `${slackQ.data.team ?? "Slack"} / ${slackQ.data.user ?? "user"}` : "Not registered"}
+          status={slackQ.data?.registered ? `Registered for ${meQ.data?.email ?? "this user"}` : "Not registered"}
           badge={slackQ.data?.registered ? "live" : "empty"}
           action={
             <Link href="/skills" className="text-xs text-muted hover:text-white">
@@ -189,10 +189,10 @@ export default function MessagesPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => saveSlack.mutate()} disabled={saveSlack.isPending || !slackToken.trim()}>
-              Save
+              Save bot
             </Button>
             <Button variant="ghost" onClick={() => clearSlack.mutate()} disabled={clearSlack.isPending || !slackQ.data?.registered}>
-              Clear
+              Remove
             </Button>
           </div>
         </ConnectorCard>

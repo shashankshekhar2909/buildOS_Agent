@@ -18,6 +18,7 @@ async def sync_agent_catalog(db: AsyncSession) -> None:
                 Agent(
                     name=name,
                     system_prompt=preset["system_prompt"],
+                    model=preset.get("model"),
                     skills=list(preset["skills"] or []),
                     enabled=True,
                     source="preset",
@@ -26,6 +27,7 @@ async def sync_agent_catalog(db: AsyncSession) -> None:
             changed = True
             continue
         row.system_prompt = preset["system_prompt"]
+        row.model = preset.get("model") or row.model
         row.skills = list(preset["skills"] or [])
         row.source = "preset"
         row.enabled = True

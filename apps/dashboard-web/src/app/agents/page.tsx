@@ -3,16 +3,21 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { API_URL, api, getToken } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { VoiceInput } from "@/components/voice-input";
 
 type Me = { id: string; email: string; role: string; is_active: boolean };
 type Agent = {
   id: string;
   name: string;
   system_prompt: string;
+  model: string | null;
   skills: string[];
   enabled: boolean;
   source: string;
@@ -25,6 +30,18 @@ type RunResult = {
   pending_tool: { tool: string; skill: string; arguments: Record<string, unknown> } | null;
   steps: { tool: string; arguments: Record<string, unknown>; result: unknown; error: string | null }[];
 };
+type LLMSettings = {
+  default_agent_model: { value: string; source: string };
+};
+type AgentPreset = {
+  id: string;
+  label: string;
+  system_prompt: string;
+  model: string | null;
+  skills: string[];
+  enabled: boolean;
+  created_at: string;
+};
 
 export default function AgentsPage() {
   const qc = useQueryClient();
@@ -34,24 +51,54 @@ export default function AgentsPage() {
     queryFn: () => api<Agent[]>("/v1/agents"),
     refetchInterval: 5000,
   });
+  const [selected, setSelected] = useState("core");
 
   const modelsQ = useQuery<{ ok: boolean; models: { id: string; provider: string; upstream: string }[]; error?: string }>({
     queryKey: ["models"],
     queryFn: () => api("/v1/models"),
     refetchInterval: 30000,
   });
+  const llmSettingsQ = useQuery<LLMSettings>({
+    queryKey: ["llm-settings"],
+    queryFn: () => api<LLMSettings>("/v1/models/settings"),
+    retry: false,
+  });
+  const presetsQ = useQuery<AgentPreset[]>({
+    queryKey: ["agent-presets", selected],
+    queryFn: () => api<AgentPreset[]>(`/v1/agents/${selected}/presets`),
+    enabled: !!selected,
+    retry: false,
+  });
   const models = modelsQ.data?.models ?? [];
+  const featuredModels = useMemo<string[]>(() => {
+    const seed = [
+      llmSettingsQ.data?.default_agent_model?.value,
+      "gemini-2.5-flash",
+      "gpt-4o",
+      "claude-sonnet",
+      "groq-llama-8b",
+      "local-ollama",
+      ...models.slice(0, 4).map((m) => m.id),
+    ].filter(Boolean) as string[];
+    return Array.from(new Set(seed));
+  }, [llmSettingsQ.data?.default_agent_model?.value, models]);
 
-  const [selected, setSelected] = useState("core");
   const [message, setMessage] = useState("");
-  const [model, setModel] = useState("claude-sonnet");
+  const [model, setModel] = useState("gemini-2.5-flash");
   const [result, setResult] = useState<RunResult | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editingPrompt, setEditingPrompt] = useState("");
+  const [editingModel, setEditingModel] = useState("gemini-2.5-flash");
   const [editingSkills, setEditingSkills] = useState("");
   const [editingEnabled, setEditingEnabled] = useState(true);
+  const [presetLabel, setPresetLabel] = useState("baseline");
+  const [presetImportText, setPresetImportText] = useState("");
+  const [presetImportFile, setPresetImportFile] = useState("");
+  const [presetImportOverwrite, setPresetImportOverwrite] = useState(true);
+  const [presetImportError, setPresetImportError] = useState<string | null>(null);
   const [createName, setCreateName] = useState("");
   const [createPrompt, setCreatePrompt] = useState("");
+  const [createModel, setCreateModel] = useState("gemini-2.5-flash");
   const [createSkills, setCreateSkills] = useState("");
 
   const isAdmin = meQ.data?.role === "admin";
@@ -62,9 +109,18 @@ export default function AgentsPage() {
     if (!current) return;
     setEditingName(current.name);
     setEditingPrompt(current.system_prompt);
+    setEditingModel(current.model || "gemini-2.5-flash");
     setEditingSkills(current.skills.join(", "));
     setEditingEnabled(current.enabled);
+    setModel(current.model || llmSettingsQ.data?.default_agent_model?.value || "gemini-2.5-flash");
   }, [current]);
+
+  useEffect(() => {
+    if (llmSettingsQ.data?.default_agent_model?.value) {
+      setModel(llmSettingsQ.data.default_agent_model.value);
+      setCreateModel(llmSettingsQ.data.default_agent_model.value);
+    }
+  }, [llmSettingsQ.data]);
 
   const create = useMutation({
     mutationFn: () =>
@@ -73,6 +129,7 @@ export default function AgentsPage() {
         body: JSON.stringify({
           name: createName,
           system_prompt: createPrompt,
+          model: createModel,
           skills: splitList(createSkills),
           enabled: true,
         }),
@@ -93,6 +150,7 @@ export default function AgentsPage() {
         body: JSON.stringify({
           name: editingName,
           system_prompt: editingPrompt,
+          model: editingModel,
           skills: splitList(editingSkills),
           enabled: editingEnabled,
         }),
@@ -129,201 +187,529 @@ export default function AgentsPage() {
     onSuccess: (r) => setResult(r),
   });
 
+  const savePreset = useMutation({
+    mutationFn: () =>
+      api<AgentPreset>(`/v1/agents/${selected}/presets/${encodeURIComponent(presetLabel.trim())}`, {
+        method: "PUT",
+      }),
+    onSuccess: () => presetsQ.refetch(),
+  });
+
+  const applyPreset = useMutation({
+    mutationFn: (label: string) =>
+      api<Agent>(`/v1/agents/${selected}/presets/${encodeURIComponent(label)}/apply`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agents"] });
+      presetsQ.refetch();
+    },
+  });
+
+  const deletePreset = useMutation({
+    mutationFn: (label: string) =>
+      api<void>(`/v1/agents/${selected}/presets/${encodeURIComponent(label)}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => presetsQ.refetch(),
+  });
+
+  const exportPresets = useMutation({
+    mutationFn: async () => {
+      const token = getToken();
+      const res = await fetch(`${API_URL}/v1/agents/${selected}/presets/export`, {
+        headers: token ? { authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return (await res.json()) as { name: string; presets: AgentPreset[] };
+    },
+    onSuccess: (bundle) => {
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `agent-presets-${bundle.name}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+
+  const importPresets = useMutation({
+    mutationFn: async () => {
+      setPresetImportError(null);
+      const parsed = JSON.parse(presetImportText) as { presets?: AgentPreset[]; [key: string]: unknown } | AgentPreset[];
+      const bundle = Array.isArray(parsed) ? { presets: parsed } : parsed;
+      return api<{ name: string; presets: AgentPreset[] }>(`/v1/agents/${selected}/presets/import`, {
+        method: "POST",
+        body: JSON.stringify({ ...bundle, overwrite: presetImportOverwrite }),
+      });
+    },
+    onSuccess: () => {
+      presetsQ.refetch();
+      setPresetImportText("");
+      setPresetImportFile("");
+    },
+    onError: (err) => {
+      setPresetImportError(err instanceof Error ? err.message : "import failed");
+    },
+  });
+
   const enabledCount = useMemo(() => agents.filter((a) => a.enabled).length, [agents]);
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-border bg-panel p-6">
-        <p className="text-xs uppercase tracking-[0.25em] text-muted">Agents</p>
-        <h1 className="mt-2 text-3xl font-semibold text-white">Live agent catalog</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
-          Agents are persisted in the DB now. Presets seed on boot, admins can add/edit/delete custom agents, and runs still call the same skill tool loop.
-        </p>
+    <div className="space-y-8 animate-fade-in">
+      {/* Catalog Header Banner */}
+      <section className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-950/40 p-6 md:p-8 backdrop-blur-md">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(124,92,255,0.12),transparent_40%)]" />
+        <div className="relative z-10">
+          <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-accent">Orchestration</span>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-white font-sans">Live Agent Catalog</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-400 font-sans">
+            Provision database-backed intelligent agents, configure primary system instructions, select models,
+            and monitor live multi-step execution traces.
+          </p>
+        </div>
+      </section>
+
+      {/* Metrics Row */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Agents Total" value={agents.length} />
+        <Metric label="Active Enabled" value={enabledCount} />
+        <Metric label="System Presets" value={agents.filter((a) => a.source === "preset").length} />
+        <Metric label="Custom Manual" value={agents.filter((a) => a.source === "manual").length} />
       </section>
 
       <section className="grid gap-4 md:grid-cols-4">
-        <Metric label="Agents total" value={agents.length} />
-        <Metric label="Enabled" value={enabledCount} />
-        <Metric label="Presets" value={agents.filter((a) => a.source === "preset").length} />
-        <Metric label="Manual" value={agents.filter((a) => a.source === "manual").length} />
+        <Metric label="Model pool" value={models.length} />
+        <Metric label="Default agent" value={llmSettingsQ.data?.default_agent_model?.value || "gemini-2.5-flash"} />
+        <Metric label="Default runtime" value={model} />
+        <Metric label="Quick picks" value={featuredModels.length} />
       </section>
 
+      <section className="grid gap-4 md:grid-cols-4">
+        <Metric label="Selected agent" value={current?.name || "none"} />
+        <Metric label="Selected model" value={current?.model || llmSettingsQ.data?.default_agent_model?.value || "gemini-2.5-flash"} />
+        <Metric label="Saved presets" value={String(presetsQ.data?.length ?? 0)} />
+        <Metric label="Preset mode" value={current?.source === "preset" ? "locked" : "editable"} />
+      </section>
+
+      {/* Create Agent Form (Admin Only) */}
       {isAdmin && (
-        <Card className="border-white/10 bg-slate-950/60">
-          <CardHeader>
-            <CardTitle className="text-sm text-white">Create agent</CardTitle>
-            <CardDescription>Manual agents are DB-backed and editable.</CardDescription>
+        <Card className="border-white/[0.06] bg-slate-950/40 backdrop-blur-md shadow-2xl">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base font-bold text-white font-sans">Provision Custom Agent</CardTitle>
+            <CardDescription className="text-xs text-slate-400">
+              Create an operational profile with customized system instructions and capability scopes.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid gap-3 md:grid-cols-3">
-              <Field label="Name">
-                <input className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none" value={createName} onChange={(e) => setCreateName(e.target.value)} />
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Agent Identifier (Name)">
+                <Input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="e.g. researcher" />
               </Field>
-              <Field label="Skills">
-                <input className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none" value={createSkills} onChange={(e) => setCreateSkills(e.target.value)} placeholder="notes, gmail" />
+              <Field label="Granted Skills (comma separated)">
+                <Input value={createSkills} onChange={(e) => setCreateSkills(e.target.value)} placeholder="e.g. notes, slack, gmail" />
               </Field>
-              <Field label="Enabled">
-                <div className="rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100">true</div>
+              <Field label="Preferred Model">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {featuredModels.map((id) => (
+                      <Button
+                        key={id}
+                        type="button"
+                        variant={createModel === id ? "default" : "outline"}
+                        className="h-8 rounded-full px-3 text-[10px] font-mono uppercase tracking-[0.15em]"
+                        onClick={() => setCreateModel(id)}
+                      >
+                        {id}
+                      </Button>
+                    ))}
+                  </div>
+                  <Select value={createModel} onChange={(e) => setCreateModel(e.target.value)}>
+                    {modelOptions(models).map(([label, ids]) => (
+                      <optgroup key={label} label={label} className="bg-[#0b0c10]">
+                        {ids.map((id) => (
+                          <option key={id} value={id}>
+                            {id}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </Select>
+                </div>
+              </Field>
+              <Field label="Initialization Status">
+                <div className="flex h-11 w-full items-center rounded-xl border border-white/[0.08] bg-[#0c0d12]/50 px-3.5 text-sm text-slate-400 font-mono">
+                  ACTIVE
+                </div>
               </Field>
             </div>
-            <Field label="System prompt">
-              <textarea className="min-h-24 w-full rounded-xl border border-border bg-bg p-3 text-sm text-slate-100 outline-none" value={createPrompt} onChange={(e) => setCreatePrompt(e.target.value)} />
+            <Field label="System Prompt / Directives">
+              <textarea className="min-h-24 w-full rounded-xl border border-white/[0.08] bg-[#0c0d12]/50 p-3.5 text-sm text-slate-200 outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30 focus:shadow-glow-accent transition-all font-sans" value={createPrompt} onChange={(e) => setCreatePrompt(e.target.value)} placeholder="You are a research assistant tasked with..." />
             </Field>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => create.mutate()} disabled={create.isPending || !createName.trim() || !createPrompt.trim()}>
-                {create.isPending ? "Creating..." : "Create agent"}
+                {create.isPending ? "Provisioning..." : "Provision Agent"}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <section className="grid gap-4 lg:grid-cols-[320px,1fr]">
-        <Card className="border-white/10 bg-slate-950/60">
-          <CardHeader>
-            <CardTitle className="text-sm text-white">Roster</CardTitle>
-            <CardDescription>Pick an agent.</CardDescription>
+      {/* Main Roster Panel Grid */}
+      <section className="grid gap-6 lg:grid-cols-[300px,1fr]">
+        {/* Roster sidebar list */}
+        <Card className="border-white/[0.06] bg-slate-950/40 backdrop-blur-md shadow-2xl h-fit">
+          <CardHeader className="pb-3 border-b border-white/[0.06] bg-white/[0.01]">
+            <CardTitle className="text-sm font-bold text-white font-sans">Active Agent Roster</CardTitle>
+            <CardDescription className="text-xs text-slate-500">Pick profile for tuning & execution.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-1">
+          <CardContent className="space-y-1.5 p-3 max-h-[600px] overflow-y-auto">
             {agents.map((a) => (
               <button
                 key={a.name}
                 onClick={() => setSelected(a.name)}
-                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
-                  selected === a.name ? "bg-accent/20 text-white" : "text-slate-300 hover:bg-white/5"
+                className={`w-full rounded-xl p-3 text-left transition-all duration-200 border ${
+                  selected === a.name
+                    ? "bg-accent/10 border-accent/30 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
+                    : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="font-medium">{a.name}</div>
-                  <Badge variant={a.enabled ? "default" : "secondary"}>{a.enabled ? "on" : "off"}</Badge>
+                  <div className="font-semibold text-sm">{a.name}</div>
+                  <span className={`inline-block h-2 w-2 rounded-full ${
+                    a.enabled ? "bg-emerald-400 status-glow-emerald" : "bg-slate-500"
+                  }`} />
                 </div>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {a.skills.slice(0, 4).map((s) => (
-                    <Badge key={s} variant="outline" className="text-[10px]">
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <Badge variant="outline" className="text-[9px] font-mono font-medium tracking-wide uppercase px-1.5 py-0 border-white/[0.08] text-slate-300">
+                    {a.source}
+                  </Badge>
+                  {a.source === "preset" ? (
+                    <Badge variant="outline" className="text-[9px] font-mono font-medium tracking-wide uppercase px-1.5 py-0 border-cyan-500/30 text-cyan-300">
+                      locked
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[9px] font-mono font-medium tracking-wide uppercase px-1.5 py-0 border-violet-500/30 text-violet-300">
+                      editable
+                    </Badge>
+                  )}
+                  {a.skills.slice(0, 3).map((s) => (
+                    <Badge key={s} variant="secondary" className="text-[9px] font-mono font-medium tracking-wide uppercase px-1.5 py-0">
                       {s}
                     </Badge>
                   ))}
-                  {a.skills.length > 4 && <span className="text-[10px] text-muted">+{a.skills.length - 4}</span>}
+                  {a.skills.length > 3 && (
+                    <span className="text-[9px] font-mono text-slate-500 px-1 font-semibold">+{a.skills.length - 3}</span>
+                  )}
+                </div>
+                <div className="mt-2 text-[10px] font-mono text-slate-500">
+                  model: {a.model || "gemini-2.5-flash"}
                 </div>
               </button>
             ))}
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
-          <Card className="border-white/10 bg-slate-950/60">
-            <CardHeader>
-              <CardTitle className="text-sm text-white">Edit agent</CardTitle>
-              <CardDescription>
-                {current ? (
-                  <span className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary">{current.source}</Badge>
-                    <Badge variant={current.enabled ? "default" : "secondary"}>{current.enabled ? "enabled" : "disabled"}</Badge>
-                  </span>
-                ) : (
-                  "No agent selected"
-                )}
-              </CardDescription>
+        {/* Detailed configuration and terminal runtime tracer */}
+        <div className="space-y-6">
+          <Card className="border-white/[0.06] bg-slate-950/40 backdrop-blur-md shadow-2xl">
+            <CardHeader className="pb-4 border-b border-white/[0.06] bg-white/[0.01]">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <CardTitle className="text-base font-bold text-white font-sans">Tuning Profile</CardTitle>
+                <div className="flex gap-2">
+                  {current && (
+                    <>
+                      <Badge variant="outline" className="font-mono text-[9px] uppercase tracking-wider border-white/[0.08]">{current.source}</Badge>
+                      <Badge variant="outline" className={`font-mono text-[9px] uppercase tracking-wider ${
+                        current.enabled
+                          ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400"
+                          : "border-white/10 bg-white/5 text-slate-400"
+                      }`}>{current.enabled ? "Enabled" : "Disabled"}</Badge>
+                    </>
+                  )}
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid gap-3 md:grid-cols-3">
-                <Field label="Name">
-                  <input className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none" value={editingName} onChange={(e) => setEditingName(e.target.value)} disabled={!isAdmin || !current} />
+            <CardContent className="space-y-4 pt-4">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Agent Identifier">
+                  <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} disabled={!isAdmin || !current} />
                 </Field>
-                <Field label="Skills">
-                  <input className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none" value={editingSkills} onChange={(e) => setEditingSkills(e.target.value)} disabled={!isAdmin || !current} />
+                <Field label="Capability Skills">
+                  <Input value={editingSkills} onChange={(e) => setEditingSkills(e.target.value)} disabled={!isAdmin || !current} />
                 </Field>
-                <Field label="Enabled">
-                  <select className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none" value={String(editingEnabled)} onChange={(e) => setEditingEnabled(e.target.value === "true")} disabled={!isAdmin || !current}>
-                    <option value="true">true</option>
-                    <option value="false">false</option>
-                  </select>
+                <Field label="Preferred Model">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {featuredModels.map((id) => (
+                        <Button
+                          key={id}
+                          type="button"
+                          variant={editingModel === id ? "default" : "outline"}
+                          className="h-8 rounded-full px-3 text-[10px] font-mono uppercase tracking-[0.15em]"
+                          onClick={() => setEditingModel(id)}
+                          disabled={!isAdmin || !current}
+                        >
+                          {id}
+                        </Button>
+                      ))}
+                    </div>
+                    <Select value={editingModel} onChange={(e) => setEditingModel(e.target.value)} disabled={!isAdmin || !current}>
+                      {modelOptions(models).map(([label, ids]) => (
+                        <optgroup key={label} label={label} className="bg-[#0b0c10]">
+                          {ids.map((id) => (
+                            <option key={id} value={id}>
+                              {id}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </Select>
+                  </div>
+                </Field>
+                <Field label="Operational Status">
+                  <Select value={String(editingEnabled)} onChange={(e) => setEditingEnabled(e.target.value === "true")} disabled={!isAdmin || !current}>
+                    <option value="true" className="bg-[#0b0c10]">Operational</option>
+                    <option value="false" className="bg-[#0b0c10]">Disabled</option>
+                  </Select>
                 </Field>
               </div>
-              <Field label="System prompt">
-                <textarea className="min-h-40 w-full rounded-xl border border-border bg-bg p-3 text-sm text-slate-100 outline-none" value={editingPrompt} onChange={(e) => setEditingPrompt(e.target.value)} disabled={!isAdmin || !current} />
+              <Field label="System Instructions (Tuning Directive)">
+                <textarea className="min-h-32 w-full rounded-xl border border-white/[0.08] bg-[#0c0d12]/50 p-3.5 text-sm text-slate-200 outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30 focus:shadow-glow-accent transition-all font-sans" value={editingPrompt} onChange={(e) => setEditingPrompt(e.target.value)} disabled={!isAdmin || !current} />
               </Field>
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => run.mutate()} disabled={!message || run.isPending || !current || !current.enabled}>
-                  {run.isPending ? "Running…" : "Run"}
-                </Button>
                 <Button variant="outline" onClick={() => toggle.mutate(!current?.enabled)} disabled={!isAdmin || !current || toggle.isPending}>
-                  {current?.enabled ? "Disable" : "Enable"}
+                  {current?.enabled ? "Deactivate" : "Activate"}
                 </Button>
-                <Button variant="ghost" onClick={() => update.mutate()} disabled={!isAdmin || !current || update.isPending}>
-                  Save
+                <Button variant="outline" onClick={() => update.mutate()} disabled={!isAdmin || !current || update.isPending}>
+                  Save changes
                 </Button>
-                <Button variant="ghost" onClick={() => remove.mutate()} disabled={!isAdmin || !current || current.source === "preset" || remove.isPending}>
-                  Delete
+                <Button variant="ghost" className="hover:bg-rose-500/10 hover:text-rose-400" onClick={() => remove.mutate()} disabled={!isAdmin || !current || current.source === "preset" || remove.isPending}>
+                  Delete agent
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-white/10 bg-slate-950/60">
-            <CardHeader>
-              <CardTitle className="text-sm text-white">Run prompt</CardTitle>
-              <CardDescription>Tool loop runs against the selected DB-backed agent.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <textarea
-                className="w-full min-h-[100px] rounded-lg border border-border bg-bg p-3 text-sm font-mono"
-                placeholder="What should the agent do?"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-              />
-              <div className="flex items-center gap-2 flex-wrap">
-                <select
-                  className="rounded-lg border border-border bg-bg px-2 py-1.5 text-xs font-mono"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                >
-                  {models.length === 0 && <option value={model}>{model}</option>}
-                  {Object.entries(
-                    models.reduce<Record<string, string[]>>((acc, m) => {
-                      (acc[m.provider] ||= []).push(m.id);
-                      return acc;
-                    }, {})
-                  ).map(([provider, ids]) => (
-                    <optgroup key={provider} label={provider}>
-                      {ids.map((id) => (
-                        <option key={id} value={id}>{id}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                {modelsQ.data && !modelsQ.data.ok && (
-                  <span className="text-[10px] text-amber-400">litellm: {modelsQ.data.error}</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {result && (
-            <Card className="border-white/10 bg-slate-950/60">
-              <CardHeader>
-                <CardTitle className="text-sm text-white">Result</CardTitle>
-                <CardDescription>
-                  stop_reason: <span className="font-mono text-white">{result.stop_reason}</span>
-                  {result.pending_tool && <span className="ml-2 text-amber-300">pending: {result.pending_tool.tool}</span>}
-                  {result.run_id && (
-                    <a href={`/agent-runs/${result.run_id}`} className="ml-3 text-indigo-300 hover:text-indigo-200">open run →</a>
-                  )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {result.output && <pre className="whitespace-pre-wrap rounded-lg border border-border bg-bg p-3 text-sm">{result.output}</pre>}
-                <div className="space-y-2">
-                  {result.steps.map((s, i) => (
-                    <div key={i} className="rounded-lg border border-border bg-bg p-3 text-xs">
-                      <div className="mb-1 flex items-center gap-2">
-                        <Badge variant="secondary">{i + 1}</Badge>
-                        <span className="font-mono text-white">{s.tool}</span>
-                        {s.error && <Badge className="bg-red-700">err</Badge>}
+              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-white">Saved Presets</div>
+                    <div className="text-xs text-slate-500">Store and restore snapshots for this agent.</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input value={presetLabel} onChange={(e) => setPresetLabel(e.target.value)} placeholder="baseline" className="w-40" disabled={!isAdmin || !current} />
+                    <Button
+                      variant="outline"
+                      onClick={() => savePreset.mutate()}
+                      disabled={!isAdmin || !current || !presetLabel.trim() || savePreset.isPending}
+                    >
+                      Save preset
+                    </Button>
+                  </div>
+                </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                  {(presetsQ.data ?? []).map((preset) => (
+                    <div key={preset.id} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm font-semibold text-white">{preset.label}</div>
+                        <Badge variant="outline" className="text-[9px] uppercase tracking-wider">
+                          {preset.enabled ? "on" : "off"}
+                        </Badge>
                       </div>
-                      <div className="grid gap-2 lg:grid-cols-2">
-                        <pre className="overflow-x-auto text-muted">{JSON.stringify(s.arguments, null, 2)}</pre>
-                        <pre className="overflow-x-auto text-emerald-300">{JSON.stringify(s.result ?? s.error, null, 2)}</pre>
+                      <div className="mt-2 text-xs text-slate-500">
+                        {preset.model || "gemini-2.5-flash"} · {preset.skills.length} skills
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => applyPreset.mutate(preset.label)} disabled={!isAdmin || applyPreset.isPending}>
+                          Apply
+                        </Button>
+                        <Button size="sm" variant="ghost" className="hover:bg-rose-500/10 hover:text-rose-400" onClick={() => deletePreset.mutate(preset.label)} disabled={!isAdmin || deletePreset.isPending}>
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {(presetsQ.data?.length ?? 0) === 0 && (
+                    <div className="rounded-lg border border-dashed border-white/[0.08] p-4 text-sm text-slate-500 md:col-span-2">
+                      No presets saved yet.
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-semibold text-white">Import / export</div>
+                      <div className="text-xs text-slate-500">Download the preset bundle or paste a bundle JSON to restore it.</div>
+                    </div>
+                    <Button variant="outline" onClick={() => exportPresets.mutate()} disabled={!isAdmin || !current || exportPresets.isPending}>
+                      Export JSON
+                    </Button>
+                  </div>
+                  <textarea
+                    className="min-h-32 w-full rounded-lg border border-white/[0.08] bg-[#0c0d12]/50 p-3 text-xs font-mono text-slate-200 outline-none"
+                    placeholder='{"presets":[{"label":"baseline","version":"0.1.0","description":"...","permissions":[],"requires_approval":true,"enabled":true,"manifest":{}}]}'
+                    value={presetImportText}
+                    onChange={(e) => setPresetImportText(e.target.value)}
+                    disabled={!isAdmin || !current}
+                  />
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="block w-full text-xs text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-accent file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-accent-hover"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setPresetImportFile(file.name);
+                      const reader = new FileReader();
+                      reader.onload = () => setPresetImportText(String(reader.result ?? ""));
+                      reader.readAsText(file);
+                    }}
+                    disabled={!isAdmin || !current}
+                  />
+                  {presetImportFile && <div className="text-[10px] font-mono text-slate-500">file: {presetImportFile}</div>}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-2 text-xs text-slate-400">
+                      <input
+                        type="checkbox"
+                        checked={presetImportOverwrite}
+                        onChange={(e) => setPresetImportOverwrite(e.target.checked)}
+                        disabled={!isAdmin || !current}
+                      />
+                      Overwrite existing
+                    </label>
+                    <Button
+                      variant="outline"
+                      onClick={() => importPresets.mutate()}
+                      disabled={!isAdmin || !current || !presetImportText.trim() || importPresets.isPending}
+                    >
+                      Import presets
+                    </Button>
+                    {presetImportError && <span className="text-xs text-rose-400">{presetImportError}</span>}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Interactive prompt runner panel */}
+          <Card className="border-white/[0.06] bg-slate-950/40 backdrop-blur-md shadow-2xl relative overflow-hidden">
+            <CardHeader className="pb-3 border-b border-white/[0.06] bg-white/[0.01]">
+              <CardTitle className="text-base font-bold text-white font-sans">Operational Runner console</CardTitle>
+              <CardDescription className="text-xs text-slate-400">
+                Execute a task-prompt against the current database operational profile.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="relative">
+                <textarea
+                  className="w-full min-h-[90px] rounded-xl border border-white/[0.08] bg-[#0c0d12]/50 p-3.5 pr-12 text-sm font-mono text-slate-200 outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/30 focus:shadow-glow-accent transition-all"
+                  placeholder="What should the agent execute? Type or press mic to speak..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                />
+                <div className="absolute right-2 top-2">
+                  <VoiceInput
+                    onTranscript={(text, isFinal) => {
+                      if (isFinal) {
+                        setMessage((prev) => (prev ? `${prev.trimEnd()} ${text}` : text));
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-slate-500">Gateway LLM:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {featuredModels.map((id) => (
+                      <Button
+                        key={id}
+                        type="button"
+                        variant={model === id ? "default" : "outline"}
+                        className="h-8 rounded-full px-3 text-[10px] font-mono uppercase tracking-[0.15em]"
+                        onClick={() => setModel(id)}
+                      >
+                        {id}
+                      </Button>
+                    ))}
+                  </div>
+                  <Select className="w-auto min-w-56 rounded-lg px-2.5 py-1.5 text-xs font-mono" value={model} onChange={(e) => setModel(e.target.value)}>
+                    {modelOptions(models).map(([label, ids]) => (
+                      <optgroup key={label} label={label} className="bg-[#0b0c10]">
+                        {ids.map((id) => (
+                          <option key={id} value={id}>{id}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                    {models.length === 0 && <option value={model}>{model}</option>}
+                  </Select>
+                  {modelsQ.data && !modelsQ.data.ok && (
+                    <span className="text-[9px] font-mono text-amber-400">Gate fail: {modelsQ.data.error}</span>
+                  )}
+                </div>
+                <Button onClick={() => run.mutate()} disabled={!message || run.isPending || !current || !current.enabled}>
+                  {run.isPending ? "Executing Loop..." : "Execute Loop"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tracer Log Output */}
+          {result && (
+            <Card className="border-white/[0.06] bg-slate-950/40 backdrop-blur-md shadow-2xl relative overflow-hidden">
+              <CardHeader className="pb-3 border-b border-white/[0.06] bg-white/[0.01]">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <CardTitle className="text-base font-bold text-white font-sans">Execution Trace Log</CardTitle>
+                  <div className="flex flex-wrap gap-2 text-xs font-mono">
+                    <span className="text-slate-500">Stop reason:</span>
+                    <span className="text-emerald-400 font-semibold">{result.stop_reason}</span>
+                    {result.pending_tool && (
+                      <span className="text-amber-400 animate-pulse font-semibold">| Pending: {result.pending_tool.tool}</span>
+                    )}
+                    {result.run_id && (
+                      <a href={`/agent-runs/${result.run_id}`} className="text-accent hover:text-accent-hover font-semibold transition-colors">
+                        [Open Details &rarr;]
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6 pt-4">
+                {result.output && (
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Final Output Stream:</span>
+                    <pre className="whitespace-pre-wrap rounded-xl border border-white/[0.06] bg-[#040508] p-4 text-xs font-mono text-slate-200 leading-relaxed max-h-40 overflow-y-auto">
+                      {result.output}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Traced step loops */}
+                <div className="space-y-4">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider block">Trace execution steps:</span>
+                  {result.steps.map((s, i) => (
+                    <div key={i} className="rounded-xl border border-white/[0.06] bg-[#0c0d12]/30 p-4 text-xs font-mono relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-accent" />
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-accent/10 border-accent/20 text-accent font-mono py-0 px-1.5 text-[9px] font-bold">Step {i + 1}</Badge>
+                          <span className="font-bold text-white tracking-wide text-xs">{s.tool}</span>
+                        </div>
+                        {s.error && <Badge className="bg-rose-500/10 border-rose-500/20 text-rose-400 text-[9px] uppercase tracking-wider font-bold">Error Signal</Badge>}
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <div className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold mb-1 font-sans">Invocation Arguments:</div>
+                          <pre className="overflow-x-auto rounded-lg bg-black/40 p-2.5 text-[11px] text-slate-400 font-mono">{JSON.stringify(s.arguments, null, 2)}</pre>
+                        </div>
+                        <div>
+                          <div className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold mb-1 font-sans">Operation Result:</div>
+                          <pre className={cn(
+                            "overflow-x-auto rounded-lg p-2.5 text-[11px] font-mono",
+                            s.error ? "bg-rose-500/5 text-rose-400 border border-rose-500/10" : "bg-black/40 text-emerald-400"
+                          )}>
+                            {JSON.stringify(s.result ?? s.error, null, 2)}
+                          </pre>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -360,4 +746,12 @@ function splitList(text: string): string[] {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function modelOptions(models: { id: string; provider: string; upstream: string }[]) {
+  const grouped = models.reduce<Record<string, string[]>>((acc, m) => {
+    (acc[m.provider] ||= []).push(m.id);
+    return acc;
+  }, {});
+  return Object.entries(grouped);
 }
