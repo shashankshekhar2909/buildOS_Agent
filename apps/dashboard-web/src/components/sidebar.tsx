@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, Box, Cpu, FileClock, Brain, Settings, Workflow, Wrench, ShieldCheck, MessageSquare, History, Users2, X } from "lucide-react";
+import { Activity, BookOpen, Box, Cpu, FileClock, Brain, Settings, Workflow, Wrench, ShieldCheck, MessageSquare, History, Users2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -11,6 +11,7 @@ import { Wordmark } from "@/components/brand/logo";
 
 const items = [
   { href: "/", label: "Overview", icon: Activity },
+  { href: "/onboarding", label: "Onboarding", icon: BookOpen },
   { href: "/nodes", label: "Nodes", icon: Cpu },
   { href: "/agents", label: "Agents", icon: Workflow },
   { href: "/agent-runs", label: "Runs", icon: History },

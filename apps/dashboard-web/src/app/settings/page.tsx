@@ -170,6 +170,7 @@ export default function SettingsPage() {
   ]);
   const globalProviders = providersQ.data ?? [];
   const userProviders = providersMeQ.data ?? [];
+  const canEditLlm = meQ.data?.role === "admin";
 
   return (
     <div className="space-y-6">
@@ -279,6 +280,11 @@ export default function SettingsPage() {
           <p className="text-sm text-muted">
             Route the runtime with live model presets. Pick OpenAI, Claude, Gemini, Groq, or local LiteLLM models.
           </p>
+          {!canEditLlm && (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
+              Admin only. View is live, edits are locked until you sign in as an admin.
+            </div>
+          )}
           {modelsQ.data && !modelsQ.data.ok && <p className="text-xs text-amber-400">Model list failed: {modelsQ.data.error}</p>}
           <div className="grid gap-3 md:grid-cols-4">
             <div className="rounded-xl border border-border bg-bg/40 p-3">
@@ -300,31 +306,31 @@ export default function SettingsPage() {
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Gemini API key">
-              <Input
-                type="password"
-                placeholder={llmSettingsQ.data?.gemini_api_key.configured ? `Stored via ${llmSettingsQ.data.gemini_api_key.source}` : "AIza..."}
-                value={geminiApiKey}
-                onChange={(e) => setGeminiApiKey(e.target.value)}
-                disabled={meQ.data?.role !== "admin"}
-              />
-            </Field>
+                <Input
+                  type="password"
+                  placeholder={llmSettingsQ.data?.gemini_api_key.configured ? `Stored via ${llmSettingsQ.data.gemini_api_key.source}` : "AIza..."}
+                  value={geminiApiKey}
+                  onChange={(e) => setGeminiApiKey(e.target.value)}
+                  disabled={!canEditLlm}
+                />
+              </Field>
             <Field label="Gemini model">
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-2">
-                  {featuredModels.map((id) => (
-                    <Button
-                      key={id}
-                      type="button"
-                      variant={geminiModel === id ? "default" : "outline"}
-                      className="h-8 rounded-full px-3 text-[10px] font-mono uppercase tracking-[0.15em]"
-                      onClick={() => setGeminiModel(id)}
-                      disabled={meQ.data?.role !== "admin"}
-                    >
-                      {id}
-                    </Button>
-                  ))}
-                </div>
-                <Select value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)} disabled={meQ.data?.role !== "admin"}>
+                      {featuredModels.map((id) => (
+                        <Button
+                          key={id}
+                          type="button"
+                          variant={geminiModel === id ? "default" : "outline"}
+                          className="h-8 rounded-full px-3 text-[10px] font-mono uppercase tracking-[0.15em]"
+                          onClick={() => setGeminiModel(id)}
+                          disabled={!canEditLlm}
+                        >
+                          {id}
+                        </Button>
+                      ))}
+                    </div>
+                <Select value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)} disabled={!canEditLlm}>
                   <option value="gemini-2.5-flash">gemini-2.5-flash</option>
                   {Object.entries(modelGroups).map(([provider, ids]) => (
                     <optgroup key={provider} label={provider}>
@@ -339,31 +345,31 @@ export default function SettingsPage() {
               </div>
             </Field>
             <Field label="LiteLLM master key">
-              <Input
-                type="password"
-                placeholder={llmSettingsQ.data?.litellm_master_key.configured ? `Stored via ${llmSettingsQ.data.litellm_master_key.source}` : "sk-..."}
-                value={llmMasterKey}
-                onChange={(e) => setLlmMasterKey(e.target.value)}
-                disabled={meQ.data?.role !== "admin"}
-              />
-            </Field>
+                <Input
+                  type="password"
+                  placeholder={llmSettingsQ.data?.litellm_master_key.configured ? `Stored via ${llmSettingsQ.data.litellm_master_key.source}` : "sk-..."}
+                  value={llmMasterKey}
+                  onChange={(e) => setLlmMasterKey(e.target.value)}
+                  disabled={!canEditLlm}
+                />
+              </Field>
             <Field label="Default chat model">
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-2">
-                  {featuredModels.map((id) => (
-                    <Button
-                      key={id}
-                      type="button"
-                      variant={defaultChatModel === id ? "default" : "outline"}
-                      className="h-8 rounded-full px-3 text-[10px] font-mono uppercase tracking-[0.15em]"
-                      onClick={() => setDefaultChatModel(id)}
-                      disabled={meQ.data?.role !== "admin"}
-                    >
-                      {id}
-                    </Button>
-                  ))}
-                </div>
-                <Select value={defaultChatModel} onChange={(e) => setDefaultChatModel(e.target.value)} disabled={meQ.data?.role !== "admin"}>
+                      {featuredModels.map((id) => (
+                        <Button
+                          key={id}
+                          type="button"
+                          variant={defaultChatModel === id ? "default" : "outline"}
+                          className="h-8 rounded-full px-3 text-[10px] font-mono uppercase tracking-[0.15em]"
+                          onClick={() => setDefaultChatModel(id)}
+                          disabled={!canEditLlm}
+                        >
+                          {id}
+                        </Button>
+                      ))}
+                    </div>
+                <Select value={defaultChatModel} onChange={(e) => setDefaultChatModel(e.target.value)} disabled={!canEditLlm}>
                   <option value="gemini-2.5-flash">gemini-2.5-flash</option>
                   <option value="gpt-4o">gpt-4o</option>
                   <option value="claude-sonnet">claude-sonnet</option>
@@ -382,7 +388,7 @@ export default function SettingsPage() {
               </div>
             </Field>
             <Field label="Default embedding model">
-              <Select value={defaultEmbeddingModel} onChange={(e) => setDefaultEmbeddingModel(e.target.value)} disabled={meQ.data?.role !== "admin"}>
+              <Select value={defaultEmbeddingModel} onChange={(e) => setDefaultEmbeddingModel(e.target.value)} disabled={!canEditLlm}>
                 <option value="embed-small">embed-small</option>
                 <option value="embed-large">embed-large</option>
                 <option value="embed-gemini">embed-gemini</option>
@@ -392,20 +398,20 @@ export default function SettingsPage() {
             <Field label="Default agent model">
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-2">
-                  {featuredModels.map((id) => (
-                    <Button
-                      key={id}
-                      type="button"
-                      variant={defaultAgentModel === id ? "default" : "outline"}
-                      className="h-8 rounded-full px-3 text-[10px] font-mono uppercase tracking-[0.15em]"
-                      onClick={() => setDefaultAgentModel(id)}
-                      disabled={meQ.data?.role !== "admin"}
-                    >
-                      {id}
-                    </Button>
-                  ))}
-                </div>
-                <Select value={defaultAgentModel} onChange={(e) => setDefaultAgentModel(e.target.value)} disabled={meQ.data?.role !== "admin"}>
+                      {featuredModels.map((id) => (
+                        <Button
+                          key={id}
+                          type="button"
+                          variant={defaultAgentModel === id ? "default" : "outline"}
+                          className="h-8 rounded-full px-3 text-[10px] font-mono uppercase tracking-[0.15em]"
+                          onClick={() => setDefaultAgentModel(id)}
+                          disabled={!canEditLlm}
+                        >
+                          {id}
+                        </Button>
+                      ))}
+                    </div>
+                <Select value={defaultAgentModel} onChange={(e) => setDefaultAgentModel(e.target.value)} disabled={!canEditLlm}>
                   <option value="gemini-2.5-flash">gemini-2.5-flash</option>
                   <option value="gpt-4o">gpt-4o</option>
                   <option value="claude-sonnet">claude-sonnet</option>
@@ -428,7 +434,7 @@ export default function SettingsPage() {
             <Button
               variant="outline"
               onClick={() => saveLlmSettings.mutate()}
-              disabled={meQ.data?.role !== "admin" || saveLlmSettings.isPending}
+              disabled={!canEditLlm || saveLlmSettings.isPending}
             >
               Save LLM settings
             </Button>

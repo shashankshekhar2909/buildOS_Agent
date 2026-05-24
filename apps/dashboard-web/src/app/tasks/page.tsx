@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { HelpBanner } from "@/components/help-banner";
 import { cn } from "@/lib/utils";
 
 type Task = {
@@ -176,6 +177,18 @@ export default function Tasks() {
           Schedule one-off or repeating tasks, test command invocations, and manage recurring automation routines.
         </p>
       </div>
+
+      <HelpBanner
+        title="Task flow"
+        description="Use presets for common schedules, then edit payload, recurrence, and timing before creating the task."
+        bullets={[
+          "Task kind drives approvals and dispatch.",
+          "Recurring tasks spawn from the scheduler.",
+          "Skill payloads use { name, payload }.",
+        ]}
+        href="/skills"
+        hrefLabel="Open skills catalog"
+      />
 
       {/* Templates Selector Section */}
       <Card className="border-white/[0.06] bg-slate-950/40 backdrop-blur-md shadow-2xl">

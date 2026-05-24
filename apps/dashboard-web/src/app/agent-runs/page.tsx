@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { HelpBanner } from "@/components/help-banner";
 
 type Step = { tool: string; arguments: Record<string, unknown>; result: unknown; error: string | null };
 type Run = {
@@ -53,6 +54,18 @@ export default function AgentRunsPage() {
           <Metric label="Completed" value={String(runs.filter((r) => r.state === "completed").length)} />
         </div>
       </section>
+
+      <HelpBanner
+        title="Run trace flow"
+        description="Open a run to inspect its tool steps, approval gates, and output. If it pauses for approval, resume from the detail page."
+        bullets={[
+          "Waiting approval means human input is needed.",
+          "Use the detail page for approve / deny.",
+          "Steps are ordered oldest first.",
+        ]}
+        href="/agents"
+        hrefLabel="Open agents"
+      />
 
       <section className="rounded-2xl border border-border bg-panel overflow-hidden">
         <div className="grid grid-cols-[1.2fr,120px,140px,160px,100px,180px] gap-3 border-b border-border bg-bg/40 px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted">

@@ -56,7 +56,20 @@ docker exec buildagent-api-gateway-1 alembic upgrade head
 
 # 5. Open
 open http://localhost:3300            # login: admin@example.com / password123
+open http://localhost:3300/onboarding # first-run checklist
 ```
+
+### First run
+
+1. Open `http://127.0.0.1:3300` or `http://localhost:3300`.
+2. Sign in with `admin@example.com` / `password123`.
+3. Open `/onboarding` for the shortest setup path.
+4. Open `/settings` and set your provider keys or Gemini key.
+5. Open `/nodes` and add a real host if you want SSH control.
+6. Open `/skills` and inspect the live catalog, then save presets if needed.
+7. Open `/tasks` for one-off or recurring work.
+
+Use `127.0.0.1` if `localhost` gives you IPv6 or CORS noise.
 
 **Free port map** — picked to dodge collisions on a populated dev machine:
 
@@ -172,6 +185,18 @@ local-ollama                           →  host.docker.internal:11434
 
 Set any one. The dashboard `/agents` page autoselects from a provider-grouped dropdown sourced from `/v1/models`. Bring your own keys, bring your own laptop.
 
+## App entry points
+
+- `/onboarding` - first-run checklist
+- `/settings` - session, providers, and model routing
+- `/users` - admin user CRUD
+- `/nodes` - fleet and SSH fields
+- `/skills` - catalog, CRUD, presets
+- `/skills/[id]` - single skill detail, run UI, import/export
+- `/agents` - agent roster, presets, runs
+- `/tasks` - scheduled and recurring work
+- `/messages` - Telegram and Slack connectors
+
 ---
 
 ## Layout
@@ -253,6 +278,9 @@ curl -s -X POST http://127.0.0.1:8800/v1/auth/login \
 # List configured providers
 TOK=$(... see above)
 curl -s http://127.0.0.1:8800/v1/models/providers -H "Authorization: Bearer $TOK"
+
+# Open onboarding
+open http://localhost:3300/onboarding
 ```
 
 ---

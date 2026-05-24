@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { HelpBanner } from "@/components/help-banner";
 
 type Me = { id: string; email: string; role: string; is_active: boolean };
 type Skill = {
@@ -191,6 +192,33 @@ export default function SkillsPage() {
         <Metric label="Selected skill" value={editingSkill?.name || "none"} />
         <Metric label="Preset mode" value={editingSkill ? (editingSkill.manifest?.source === "manual" ? "manual" : "file") : "idle"} />
         <Metric label="Approval state" value={editingSkill?.requires_approval ? "gated" : "open"} />
+      </section>
+
+      <HelpBanner
+        title="Skill catalog"
+        description="Use the catalog to create manual skills, inspect file-backed ones, and manage presets. The detail page handles export/import and runtime execution."
+        bullets={[
+          "Open a skill for per-skill run controls.",
+          "Presets store manifest + approval flags.",
+          "Admins can create, edit, disable, and delete manual entries.",
+        ]}
+        href={editingSkill ? `/skills/${editingSkill.id}` : undefined}
+        hrefLabel={editingSkill ? "Open selected skill" : undefined}
+      />
+
+      <section className="rounded-2xl border border-border bg-panel p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-white">Preset workflow</div>
+            <div className="text-xs text-muted">
+              Pick a skill, edit presets here, or open the skill detail page for export/import and runtime controls.
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{selectedPresetsQ.data?.length ?? 0} saved</Badge>
+            <Badge variant="secondary">{editingSkill?.name || "no skill selected"}</Badge>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1fr_1.3fr]">

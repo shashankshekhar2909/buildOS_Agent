@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { HelpBanner } from "@/components/help-banner";
 
 type Step = { tool: string; arguments: Record<string, unknown>; result: unknown; error: string | null };
 type Msg = { role: string; content: string | null; tool_call_id?: string; name?: string; tool_calls?: unknown };
@@ -108,6 +109,18 @@ export default function AgentRunDetail() {
           <Link href="/agent-runs" className="text-xs text-muted hover:text-white">← back</Link>
         </div>
       </section>
+
+      <HelpBanner
+        title="Approval pause"
+        description="If the run stops on a risky tool, approve or deny here. The agent resumes with the tool result after approval."
+        bullets={[
+          "The pending tool payload is shown before you decide.",
+          "Deny ends the run path.",
+          "Approve resumes the same loop.",
+        ]}
+        href="/approvals"
+        hrefLabel="Open approvals"
+      />
 
       {linkedApproval && (
         <Card className="border-amber-500/40 bg-amber-950/30">

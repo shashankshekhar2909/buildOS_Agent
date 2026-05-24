@@ -340,6 +340,40 @@ export default function SkillDetailPage() {
   const isTelegram = skill?.name === "telegram";
   const isSlack = skill?.name === "slack";
   const isSsh = skill?.name === "ssh";
+  const sampleSkillBundle = useMemo(() => {
+    const base = skill ?? {
+      name: "sample",
+      version: "0.1.0",
+      description: "Sample skill",
+      permissions: [] as string[],
+      requires_approval: true,
+      enabled: true,
+      manifest: { source: "manual" } as Record<string, unknown>,
+    };
+    return {
+      overwrite: true,
+      presets: [
+        {
+          label: "baseline",
+          version: base.version,
+          description: base.description,
+          permissions: base.permissions,
+          requires_approval: base.requires_approval,
+          enabled: base.enabled,
+          manifest: { ...base.manifest, source: "manual" },
+        },
+        {
+          label: "safe-readonly",
+          version: base.version,
+          description: "Read-only preset for inspection flows.",
+          permissions: base.permissions,
+          requires_approval: true,
+          enabled: true,
+          manifest: { ...(base.manifest ?? {}), source: "manual" },
+        },
+      ],
+    };
+  }, [skill]);
 
   useEffect(() => {
     if (!isSsh) return;
@@ -1335,9 +1369,39 @@ export default function SkillDetailPage() {
                 <div className="text-sm font-semibold text-white">Import / export</div>
                 <div className="text-xs text-muted">Download the bundle or paste a JSON export to restore it.</div>
               </div>
-              <Button variant="outline" onClick={() => exportPresets.mutate()} disabled={!isAdmin || !skill || exportPresets.isPending}>
-                Export JSON
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => setPresetImportText(JSON.stringify(sampleSkillBundle, null, 2))}
+                  disabled={!isAdmin || !skill}
+                >
+                  Load sample bundle
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const bundle = {
+                      overwrite: true,
+                      presets: (presetsQ.data ?? []).map((preset) => ({
+                        label: preset.label,
+                        version: preset.version,
+                        description: preset.description,
+                        permissions: preset.permissions,
+                        requires_approval: preset.requires_approval,
+                        enabled: preset.enabled,
+                        manifest: { source: "manual" },
+                      })),
+                    };
+                    setPresetImportText(JSON.stringify(bundle, null, 2));
+                  }}
+                  disabled={!isAdmin || !skill || (presetsQ.data?.length ?? 0) === 0}
+                >
+                  Load current bundle
+                </Button>
+                <Button variant="outline" onClick={() => exportPresets.mutate()} disabled={!isAdmin || !skill || exportPresets.isPending}>
+                  Export JSON
+                </Button>
+              </div>
             </div>
             <textarea
               className="min-h-32 w-full rounded-xl border border-border bg-bg p-3 text-xs font-mono text-slate-200 outline-none"

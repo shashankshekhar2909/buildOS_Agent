@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { HelpBanner } from "@/components/help-banner";
 import { cn } from "@/lib/utils";
 
 type Me = { id: string; email: string; role: string; is_active: boolean };
@@ -133,6 +134,18 @@ export default function Nodes() {
           Manage your distributed processing nodes, issue register tokens, and monitor host system metrics.
         </p>
       </div>
+
+      <HelpBanner
+        title="Node setup"
+        description="Add host, user, and SSH auth here. The SSH skill reads these saved fields when you run commands against a node."
+        bullets={[
+          "Create nodes from the admin form.",
+          "Use password or private key auth.",
+          "Open a node detail page for SSH target and telemetry.",
+        ]}
+        href="/skills/ssh"
+        hrefLabel="Open SSH skill"
+      />
 
       {isAdmin && (
       <div className="grid gap-6 md:grid-cols-2">

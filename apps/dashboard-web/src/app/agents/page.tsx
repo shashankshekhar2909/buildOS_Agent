@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { HelpBanner } from "@/components/help-banner";
 import { cn } from "@/lib/utils";
 import { VoiceInput } from "@/components/voice-input";
 
@@ -104,6 +105,36 @@ export default function AgentsPage() {
   const isAdmin = meQ.data?.role === "admin";
   const agents = agentsQ.data ?? [];
   const current = agents.find((a) => a.name === selected);
+  const sampleAgentBundle = useMemo(() => {
+    const base = current ?? {
+      name: "sample-agent",
+      system_prompt: "You are a focused BuildAgent assistant.",
+      model: llmSettingsQ.data?.default_agent_model?.value || "gemini-2.5-flash",
+      skills: ["notes"],
+      enabled: true,
+    };
+    return {
+      overwrite: true,
+      presets: [
+        {
+          label: "baseline",
+          system_prompt: base.system_prompt,
+          model: base.model,
+          skills: base.skills,
+          enabled: base.enabled,
+          manifest: { source: "manual" },
+        },
+        {
+          label: "locked-minimal",
+          system_prompt: "You are a minimal safe agent. Prefer read-only actions.",
+          model: base.model,
+          skills: base.skills.slice(0, 1),
+          enabled: false,
+          manifest: { source: "manual" },
+        },
+      ],
+    };
+  }, [current, llmSettingsQ.data?.default_agent_model?.value]);
 
   useEffect(() => {
     if (!current) return;
@@ -272,6 +303,18 @@ export default function AgentsPage() {
       </section>
 
       {/* Metrics Row */}
+      <HelpBanner
+        title="Agent loop"
+        description="Use the roster to pick an agent, tune its prompt and skills, then run a live loop. Presets can be exported, imported, and applied to restore exact configs."
+        bullets={[
+          "Admin can edit agents and saved presets.",
+          "Model dropdowns are live from /v1/models.",
+          "Approval stops are normal; resume after decision.",
+        ]}
+        href="/onboarding"
+        hrefLabel="See setup path"
+      />
+
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Metric label="Agents Total" value={agents.length} />
         <Metric label="Active Enabled" value={enabledCount} />
@@ -540,9 +583,38 @@ export default function AgentsPage() {
                       <div className="text-sm font-semibold text-white">Import / export</div>
                       <div className="text-xs text-slate-500">Download the preset bundle or paste a bundle JSON to restore it.</div>
                     </div>
-                    <Button variant="outline" onClick={() => exportPresets.mutate()} disabled={!isAdmin || !current || exportPresets.isPending}>
-                      Export JSON
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setPresetImportText(JSON.stringify(sampleAgentBundle, null, 2))}
+                        disabled={!isAdmin || !current}
+                      >
+                        Load sample bundle
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const bundle = {
+                            overwrite: true,
+                            presets: (presetsQ.data ?? []).map((preset) => ({
+                              label: preset.label,
+                              system_prompt: preset.system_prompt,
+                              model: preset.model,
+                              skills: preset.skills,
+                              enabled: preset.enabled,
+                              manifest: { source: "manual" },
+                            })),
+                          };
+                          setPresetImportText(JSON.stringify(bundle, null, 2));
+                        }}
+                        disabled={!isAdmin || !current || (presetsQ.data?.length ?? 0) === 0}
+                      >
+                        Load current bundle
+                      </Button>
+                      <Button variant="outline" onClick={() => exportPresets.mutate()} disabled={!isAdmin || !current || exportPresets.isPending}>
+                        Export JSON
+                      </Button>
+                    </div>
                   </div>
                   <textarea
                     className="min-h-32 w-full rounded-lg border border-white/[0.08] bg-[#0c0d12]/50 p-3 text-xs font-mono text-slate-200 outline-none"

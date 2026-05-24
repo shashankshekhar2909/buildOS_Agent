@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { HelpBanner } from "@/components/help-banner";
 
 type Me = { id: string; email: string; role: string; is_active: boolean };
 
@@ -115,6 +116,18 @@ export default function MessagesPage() {
         <h1 className="mt-2 text-3xl font-semibold text-white">Messaging hub</h1>
         <p className="mt-2 text-sm text-muted">Register each bot once per user. Secrets stay server-side and are isolated by account.</p>
       </div>
+
+      <HelpBanner
+        title="Messaging connectors"
+        description="Register Telegram and Slack once per user. Skills can then send or inspect messages without sharing tokens across accounts."
+        bullets={[
+          "Each user gets their own server-side connector record.",
+          "WhatsApp stays on the skill page for now.",
+          "Use Skills for execution, Messages for registration.",
+        ]}
+        href="/skills/telegram"
+        hrefLabel="Open Telegram skill"
+      />
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ConnectorCard
