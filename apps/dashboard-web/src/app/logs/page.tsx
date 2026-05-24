@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { HelpBanner } from "@/components/help-banner";
 
 type AuditLog = {
   id: string;
@@ -74,6 +75,18 @@ export default function LogsPage() {
           </select>
         </div>
       </div>
+
+      <HelpBanner
+        title="Audit trail"
+        description="Search privileged actions, inspect metadata, and trace who changed what. Use this when a flow behaves unexpectedly."
+        bullets={[
+          "Filter by actor kind or free text.",
+          "Audit records are append-only.",
+          "Most state changes should show up here.",
+        ]}
+        href="/users"
+        hrefLabel="Open users"
+      />
 
       {error && (
         <div className="rounded border border-border bg-panel p-3 text-sm text-red-300">

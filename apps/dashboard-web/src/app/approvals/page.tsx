@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/card";
+import { HelpBanner } from "@/components/help-banner";
 import { cn } from "@/lib/utils";
 
 type Approval = {
@@ -46,6 +47,18 @@ export default function Approvals() {
           Approve or deny privileged actions triggered by automation tasks or model directives.
         </p>
       </div>
+
+      <HelpBanner
+        title="Approval gate"
+        description="Approve risky actions here. If a run or task is paused, the detail page will show the pending payload and the loop will resume after approval."
+        bullets={[
+          "High-risk tools pause here.",
+          "Open the agent run detail for context.",
+          "Deny keeps the action blocked.",
+        ]}
+        href="/agent-runs"
+        hrefLabel="Open runs"
+      />
 
       {/* Approvals List Queue */}
       <div className="space-y-4">

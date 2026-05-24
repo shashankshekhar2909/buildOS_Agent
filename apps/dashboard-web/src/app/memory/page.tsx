@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { HelpBanner } from "@/components/help-banner";
 
 type Mem = {
   id: string;
@@ -85,6 +86,18 @@ export default function MemoryPage() {
           )}
         </div>
       </section>
+
+      <HelpBanner
+        title="Memory loop"
+        description="Store notes and facts, then search them semantically. The memory skill uses the same store, so agents and humans share one long-term pool."
+        bullets={[
+          "Save a short fact or note first.",
+          "Search is cosine similarity over embeddings.",
+          "Delete only removes your own memories.",
+        ]}
+        href="/skills/memory"
+        hrefLabel="Open memory skill"
+      />
 
       <section className="grid gap-4 lg:grid-cols-2">
         <Card className="border-white/10 bg-slate-950/60">
