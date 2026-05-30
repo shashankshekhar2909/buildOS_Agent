@@ -134,6 +134,8 @@ export default function SkillDetailPage() {
   const [sshCommand, setSshCommand] = useState("hostname");
   const [sshTimeout, setSshTimeout] = useState("60");
   const [sshPty, setSshPty] = useState(false);
+  const [sshParseOutput, setSshParseOutput] = useState(true);
+  const [sshParseFormat, setSshParseFormat] = useState<"lines" | "docker_names">("lines");
 
   const meQ = useQuery<Me>({
     queryKey: ["me"],
@@ -477,8 +479,10 @@ export default function SkillDetailPage() {
       command: sshCommand,
       timeout: Number(sshTimeout) || 60,
       pty: sshPty,
+      parse_output: sshParseOutput,
+      parse_format: sshParseFormat,
     };
-  }, [isSsh, sshCommand, sshNodeId, sshPty, sshTimeout]);
+  }, [isSsh, sshCommand, sshNodeId, sshParseFormat, sshParseOutput, sshPty, sshTimeout]);
 
   const runSkill = useMutation({
     mutationFn: async () => {
@@ -1246,6 +1250,29 @@ export default function SkillDetailPage() {
                       </label>
                     </div>
 
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
+                        <input
+                          type="checkbox"
+                          checked={sshParseOutput}
+                          onChange={(e) => setSshParseOutput(e.target.checked)}
+                        />
+                        Parse output
+                      </label>
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-[0.2em] text-muted">Parse format</label>
+                        <select
+                          className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+                          value={sshParseFormat}
+                          onChange={(e) => setSshParseFormat(e.target.value as typeof sshParseFormat)}
+                          disabled={!sshParseOutput}
+                        >
+                          <option value="lines">lines</option>
+                          <option value="docker_names">docker names</option>
+                        </select>
+                      </div>
+                    </div>
+
                     <div className="rounded-xl border border-border bg-panel p-4 space-y-3">
                       <div className="text-xs uppercase tracking-[0.2em] text-muted">SSH target</div>
                       <div className="text-sm text-slate-200">
@@ -1300,6 +1327,7 @@ export default function SkillDetailPage() {
                     </div>
                     {runTask.error && <p className="text-red-300">{runTask.error}</p>}
                     <DataTable title="Task result" data={runTask.result} accent />
+                    <ParsedOutput data={runTask.result} />
                   </div>
                 )}
               </CardContent>
@@ -1477,6 +1505,31 @@ function DataTable({ title, data, accent = false }: { title: string; data: unkno
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ParsedOutput({ data }: { data: unknown }) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const parsed = (data as Record<string, unknown>).parsed_stdout;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const payload = parsed as Record<string, unknown>;
+  const items = Array.isArray(payload.items) ? payload.items.map((item) => String(item)).filter(Boolean) : [];
+  if (items.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-border bg-bg">
+      <div className="border-b border-border px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-muted">Parsed stdout</div>
+      <div className="px-3 py-2 text-[11px] text-muted">
+        format {String(payload.format ?? "lines")} · {String(payload.count ?? items.length)} items
+      </div>
+      <div className="max-h-64 overflow-auto divide-y divide-border">
+        {items.map((item, index) => (
+          <div key={`${item}-${index}`} className="px-3 py-2 font-mono text-xs text-emerald-200 break-all">
+            {item}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

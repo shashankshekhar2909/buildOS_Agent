@@ -5,23 +5,25 @@ name: buildagent
 # Internal port = service framework default. Host port = remapped to free port.
 
 x-common-env: &common-env
-  DATABASE_URL: ${DATABASE_URL}
-  REDIS_URL: ${REDIS_URL}
-  JWT_SECRET: ${JWT_SECRET}
+  DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://buildagent:buildagent@postgres:5432/buildagent}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  JWT_SECRET: ${JWT_SECRET:-change-me-in-prod-please-32-chars-min}
   JWT_ALG: ${JWT_ALG:-HS256}
   JWT_ACCESS_TTL_MIN: ${JWT_ACCESS_TTL_MIN:-15}
   JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-30}
-  NODE_TOKEN: ${NODE_TOKEN}
-  INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
-  BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
-  BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+  NODE_TOKEN: ${NODE_TOKEN:-change-me-node-token}
+  INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me-internal-token}
+  BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+  BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-password123}
   LITELLM_URL: ${LITELLM_URL:-http://litellm:4000}
-  LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
-  GEMINI_API_KEY: ${GEMINI_API_KEY}
+  LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-buildagent-master}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
   GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-buildagent-whatsapp}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://127.0.0.1:3300}
   FERNET_KEY: ${FERNET_KEY:-}
   EMBEDDING_MODEL: ${EMBEDDING_MODEL:-embed-small}
+  BUILDAGENT_WORKSPACE_ROOT: ${BUILDAGENT_WORKSPACE_ROOT:-/workspace/buildagent-files}
 
 services:
   postgres:
@@ -98,6 +100,9 @@ services:
       <<: *common-env
     ports:
       - "${HOST_API_PORT:-8800}:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../../.buildagent-files:/workspace/buildagent-files
     networks: [bnet]
 
   dashboard-web:

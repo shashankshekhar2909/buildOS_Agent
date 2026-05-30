@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     litellm_url: str = "http://localhost:4000"
     litellm_master_key: str = "sk-buildagent-master"
+    whatsapp_webhook_verify_token: str = "buildagent-whatsapp"
 
     cors_origins_raw: str = Field(default="http://127.0.0.1:3300", alias="CORS_ORIGINS")
 

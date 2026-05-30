@@ -26,6 +26,14 @@ type SlackConnector = {
   default_channel_id: string | null;
 };
 
+type WhatsAppConnector = {
+  registered: boolean;
+  phone_number_id: string | null;
+  version: string | null;
+  default_agent: string | null;
+  default_model: string | null;
+};
+
 export default function MessagesPage() {
   const qc = useQueryClient();
   const meQ = useQuery<Me>({
@@ -48,10 +56,22 @@ export default function MessagesPage() {
     retry: false,
   });
 
+  const whatsappQ = useQuery<WhatsAppConnector>({
+    queryKey: ["messages-whatsapp", meQ.data?.id ?? "anon"],
+    queryFn: () => api<WhatsAppConnector>("/v1/connectors/whatsapp"),
+    enabled: Boolean(meQ.data?.id),
+    retry: false,
+  });
+
   const [telegramToken, setTelegramToken] = useState("");
   const [telegramDefaultChatId, setTelegramDefaultChatId] = useState("");
   const [slackToken, setSlackToken] = useState("");
   const [slackDefaultChannelId, setSlackDefaultChannelId] = useState("");
+  const [whatsappAccessToken, setWhatsappAccessToken] = useState("");
+  const [whatsappPhoneNumberId, setWhatsappPhoneNumberId] = useState("");
+  const [whatsappVersion, setWhatsappVersion] = useState("v20.0");
+  const [whatsappDefaultAgent, setWhatsappDefaultAgent] = useState("core");
+  const [whatsappDefaultModel, setWhatsappDefaultModel] = useState("");
 
   useEffect(() => {
     if (telegramQ.data?.default_chat_id) setTelegramDefaultChatId(telegramQ.data.default_chat_id);
@@ -60,6 +80,13 @@ export default function MessagesPage() {
   useEffect(() => {
     if (slackQ.data?.default_channel_id) setSlackDefaultChannelId(slackQ.data.default_channel_id);
   }, [slackQ.data?.default_channel_id]);
+
+  useEffect(() => {
+    if (whatsappQ.data?.phone_number_id) setWhatsappPhoneNumberId(whatsappQ.data.phone_number_id);
+    if (whatsappQ.data?.version) setWhatsappVersion(whatsappQ.data.version);
+    if (whatsappQ.data?.default_agent) setWhatsappDefaultAgent(whatsappQ.data.default_agent);
+    if (whatsappQ.data?.default_model) setWhatsappDefaultModel(whatsappQ.data.default_model);
+  }, [whatsappQ.data?.default_agent, whatsappQ.data?.default_model, whatsappQ.data?.phone_number_id, whatsappQ.data?.version]);
 
   const saveTelegram = useMutation({
     mutationFn: () =>
@@ -106,6 +133,36 @@ export default function MessagesPage() {
       setSlackToken("");
       setSlackDefaultChannelId("");
       qc.invalidateQueries({ queryKey: ["messages-slack", meQ.data?.id ?? "anon"] });
+    },
+  });
+
+  const saveWhatsapp = useMutation({
+    mutationFn: () =>
+      api<WhatsAppConnector>("/v1/connectors/whatsapp", {
+        method: "PUT",
+        body: JSON.stringify({
+          access_token: whatsappAccessToken,
+          phone_number_id: whatsappPhoneNumberId,
+          version: whatsappVersion,
+          default_agent: whatsappDefaultAgent || "core",
+          default_model: whatsappDefaultModel || null,
+        }),
+      }),
+    onSuccess: () => {
+      setWhatsappAccessToken("");
+      qc.invalidateQueries({ queryKey: ["messages-whatsapp", meQ.data?.id ?? "anon"] });
+    },
+  });
+
+  const clearWhatsapp = useMutation({
+    mutationFn: () => api<void>("/v1/connectors/whatsapp", { method: "DELETE" }),
+    onSuccess: () => {
+      setWhatsappAccessToken("");
+      setWhatsappPhoneNumberId("");
+      setWhatsappVersion("v20.0");
+      setWhatsappDefaultAgent("core");
+      setWhatsappDefaultModel("");
+      qc.invalidateQueries({ queryKey: ["messages-whatsapp", meQ.data?.id ?? "anon"] });
     },
   });
 
@@ -205,6 +262,70 @@ export default function MessagesPage() {
               Save bot
             </Button>
             <Button variant="ghost" onClick={() => clearSlack.mutate()} disabled={clearSlack.isPending || !slackQ.data?.registered}>
+              Remove
+            </Button>
+          </div>
+        </ConnectorCard>
+
+        <ConnectorCard
+          title="WhatsApp"
+          description="Register a WhatsApp Cloud API number and let messages trigger agent tasks."
+          status={whatsappQ.data?.registered ? `Registered for ${meQ.data?.email ?? "this user"}` : "Not registered"}
+          badge={whatsappQ.data?.registered ? "live" : "empty"}
+          action={
+            <Link href="/skills/whatsapp" className="text-xs text-muted hover:text-white">
+              Open WhatsApp skill
+            </Link>
+          }
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Phone number ID">
+              <input
+                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+                value={whatsappPhoneNumberId}
+                onChange={(e) => setWhatsappPhoneNumberId(e.target.value)}
+                placeholder="123456789"
+              />
+            </Field>
+            <Field label="Graph version">
+              <input
+                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+                value={whatsappVersion}
+                onChange={(e) => setWhatsappVersion(e.target.value)}
+                placeholder="v20.0"
+              />
+            </Field>
+            <Field label="Default agent">
+              <input
+                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+                value={whatsappDefaultAgent}
+                onChange={(e) => setWhatsappDefaultAgent(e.target.value)}
+                placeholder="core"
+              />
+            </Field>
+            <Field label="Default model">
+              <input
+                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+                value={whatsappDefaultModel}
+                onChange={(e) => setWhatsappDefaultModel(e.target.value)}
+                placeholder="gemini-flash"
+              />
+            </Field>
+          </div>
+          <Field label="Access token">
+            <input
+              className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-slate-100 outline-none"
+              type="password"
+              value={whatsappAccessToken}
+              onChange={(e) => setWhatsappAccessToken(e.target.value)}
+              placeholder="token"
+            />
+          </Field>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => saveWhatsapp.mutate()} disabled={saveWhatsapp.isPending || !whatsappAccessToken.trim() || !whatsappPhoneNumberId.trim()}>
+              Save WhatsApp
+            </Button>
+            <Button variant="ghost" onClick={() => clearWhatsapp.mutate()} disabled={clearWhatsapp.isPending || !whatsappQ.data?.registered}>
               Remove
             </Button>
           </div>

@@ -19,3 +19,4 @@ coverage
 .antigravitycli/
 .venv-test/
 .pytest_cache/
+.buildagent-files/

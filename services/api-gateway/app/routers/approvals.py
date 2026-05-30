@@ -13,6 +13,7 @@ from app.events import publish
 from app.models import AgentRun, AgentRunState, Approval, ApprovalState, AuditLog, Task, TaskState, User
 from app.schemas import ApprovalDecision, ApprovalOut
 from app.task_schedule import should_delay
+from app.whatsapp_bridge import send_whatsapp_message
 
 router = APIRouter(prefix="/v1/approvals", tags=["approvals"])
 
@@ -128,10 +129,20 @@ async def _resume_agent_run(db: AsyncSession, appr: Approval, approved: bool) ->
     run.stop_reason = cont.stop_reason
     run.output = cont.output or None
     run.pending_tool = cont.pending_tool
+    task = (await db.execute(select(Task).where(Task.agent_run_id == run.id))).scalar_one_or_none()
     if cont.stop_reason == "completed":
         run.state = AgentRunState.completed
+        if task:
+            task.state = TaskState.completed
+            task.result = {"agent": run.agent_name, **cont.to_dict()}
+            task.error = None
+            task.finished_at = datetime.now(tz=timezone.utc)
     elif cont.stop_reason == "approval_required":
         run.state = AgentRunState.waiting_approval
+        if task:
+            task.state = TaskState.waiting_approval
+            task.result = {"agent": run.agent_name, **cont.to_dict()}
+            task.error = "approval required"
         if cont.pending_tool:
             db.add(Approval(
                 agent_run_id=run.id,
@@ -143,3 +154,40 @@ async def _resume_agent_run(db: AsyncSession, appr: Approval, approved: bool) ->
             ))
     else:
         run.state = AgentRunState.failed
+        if task:
+            task.state = TaskState.failed
+            task.result = {"agent": run.agent_name, **cont.to_dict()}
+            task.error = cont.stop_reason or "failed"
+            task.finished_at = datetime.now(tz=timezone.utc)
+
+    if task:
+        reply = _agent_task_reply(task, run, cont.stop_reason)
+        if reply:
+            meta = task.payload or {}
+            await send_whatsapp_message(
+                str(meta.get("whatsapp_access_token") or ""),
+                str(meta.get("whatsapp_version") or "v20.0"),
+                str(meta.get("whatsapp_phone_number_id") or ""),
+                str(meta.get("whatsapp_reply_to") or ""),
+                reply,
+            )
+
+
+def _agent_task_reply(task: Task, run: AgentRun, stop_reason: str) -> str | None:
+    payload = task.payload or {}
+    if not str(payload.get("whatsapp_reply_to") or "").strip():
+        return None
+    if stop_reason == "completed":
+        return _trim_reply(str(run.output or "Done."))
+    if stop_reason == "approval_required":
+        pending = run.pending_tool or {}
+        skill = pending.get("skill") or pending.get("tool") or "tool"
+        return f"Need approval for {skill}. Open BuildAgent approvals."
+    return f"Failed: {run.error or stop_reason or 'unknown error'}"
+
+
+def _trim_reply(text: str, limit: int = 3000) -> str:
+    value = text.strip()
+    if len(value) <= limit:
+        return value
+    return value[: limit - 24].rstrip() + "\n\n[truncated]"

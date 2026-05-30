@@ -27,6 +27,7 @@ class Task(Base):
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
     state: Mapped[TaskState] = mapped_column(SAEnum(TaskState), default=TaskState.pending)
     node_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("nodes.id"), nullable=True)
+    agent_run_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("agent_runs.id"), nullable=True)
     parent_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("tasks.id"), nullable=True)
     created_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     result: Mapped[dict] = mapped_column(JSON, default=dict)

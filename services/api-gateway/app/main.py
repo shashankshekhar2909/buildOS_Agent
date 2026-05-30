@@ -8,7 +8,7 @@ from app.agent_catalog import sync_agent_catalog
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine  # noqa: F401
 from app.llm_store import refresh_llm_settings
-from app.routers import agent_runs, agents, approvals, audit, auth, connectors, devices, grants, memory as memory_router, models as models_router, nodes, secrets as secrets_router, skills, tasks, users
+from app.routers import agent_runs, agents, approvals, audit, auth, connectors, devices, grants, memory as memory_router, models as models_router, nodes, projects, secrets as secrets_router, skills, tasks, users
 from app.skill_loader import sync_skill_catalog
 from app.scheduler import run_task_scheduler
 from app.ws import client as ws_client, node as ws_node
@@ -52,6 +52,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(nodes.router)
+app.include_router(projects.router)
 app.include_router(tasks.router)
 app.include_router(approvals.router)
 app.include_router(audit.router)

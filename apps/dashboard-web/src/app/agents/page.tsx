@@ -74,7 +74,7 @@ export default function AgentsPage() {
   const featuredModels = useMemo<string[]>(() => {
     const seed = [
       llmSettingsQ.data?.default_agent_model?.value,
-      "gemini-2.5-flash",
+      "gemini-flash",
       "gpt-4o",
       "claude-sonnet",
       "groq-llama-8b",
@@ -85,11 +85,11 @@ export default function AgentsPage() {
   }, [llmSettingsQ.data?.default_agent_model?.value, models]);
 
   const [message, setMessage] = useState("");
-  const [model, setModel] = useState("gemini-2.5-flash");
+  const [model, setModel] = useState("gemini-flash");
   const [result, setResult] = useState<RunResult | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editingPrompt, setEditingPrompt] = useState("");
-  const [editingModel, setEditingModel] = useState("gemini-2.5-flash");
+  const [editingModel, setEditingModel] = useState("gemini-flash");
   const [editingSkills, setEditingSkills] = useState("");
   const [editingEnabled, setEditingEnabled] = useState(true);
   const [presetLabel, setPresetLabel] = useState("baseline");
@@ -99,7 +99,7 @@ export default function AgentsPage() {
   const [presetImportError, setPresetImportError] = useState<string | null>(null);
   const [createName, setCreateName] = useState("");
   const [createPrompt, setCreatePrompt] = useState("");
-  const [createModel, setCreateModel] = useState("gemini-2.5-flash");
+  const [createModel, setCreateModel] = useState("gemini-flash");
   const [createSkills, setCreateSkills] = useState("");
 
   const isAdmin = meQ.data?.role === "admin";
@@ -109,7 +109,7 @@ export default function AgentsPage() {
     const base = current ?? {
       name: "sample-agent",
       system_prompt: "You are a focused BuildAgent assistant.",
-      model: llmSettingsQ.data?.default_agent_model?.value || "gemini-2.5-flash",
+      model: llmSettingsQ.data?.default_agent_model?.value || "gemini-flash",
       skills: ["notes"],
       enabled: true,
     };
@@ -140,10 +140,10 @@ export default function AgentsPage() {
     if (!current) return;
     setEditingName(current.name);
     setEditingPrompt(current.system_prompt);
-    setEditingModel(current.model || "gemini-2.5-flash");
+    setEditingModel(current.model || "gemini-flash");
     setEditingSkills(current.skills.join(", "));
     setEditingEnabled(current.enabled);
-    setModel(current.model || llmSettingsQ.data?.default_agent_model?.value || "gemini-2.5-flash");
+    setModel(current.model || llmSettingsQ.data?.default_agent_model?.value || "gemini-flash");
   }, [current]);
 
   useEffect(() => {
@@ -324,14 +324,14 @@ export default function AgentsPage() {
 
       <section className="grid gap-4 md:grid-cols-4">
         <Metric label="Model pool" value={models.length} />
-        <Metric label="Default agent" value={llmSettingsQ.data?.default_agent_model?.value || "gemini-2.5-flash"} />
+        <Metric label="Default agent" value={llmSettingsQ.data?.default_agent_model?.value || "gemini-flash"} />
         <Metric label="Default runtime" value={model} />
         <Metric label="Quick picks" value={featuredModels.length} />
       </section>
 
       <section className="grid gap-4 md:grid-cols-4">
         <Metric label="Selected agent" value={current?.name || "none"} />
-        <Metric label="Selected model" value={current?.model || llmSettingsQ.data?.default_agent_model?.value || "gemini-2.5-flash"} />
+        <Metric label="Selected model" value={current?.model || llmSettingsQ.data?.default_agent_model?.value || "gemini-flash"} />
         <Metric label="Saved presets" value={String(presetsQ.data?.length ?? 0)} />
         <Metric label="Preset mode" value={current?.source === "preset" ? "locked" : "editable"} />
       </section>
@@ -447,7 +447,7 @@ export default function AgentsPage() {
                   )}
                 </div>
                 <div className="mt-2 text-[10px] font-mono text-slate-500">
-                  model: {a.model || "gemini-2.5-flash"}
+                  model: {a.model || "gemini-flash"}
                 </div>
               </button>
             ))}
@@ -559,7 +559,7 @@ export default function AgentsPage() {
                         </Badge>
                       </div>
                       <div className="mt-2 text-xs text-slate-500">
-                        {preset.model || "gemini-2.5-flash"} · {preset.skills.length} skills
+                        {preset.model || "gemini-flash"} · {preset.skills.length} skills
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Button size="sm" variant="outline" onClick={() => applyPreset.mutate(preset.label)} disabled={!isAdmin || applyPreset.isPending}>

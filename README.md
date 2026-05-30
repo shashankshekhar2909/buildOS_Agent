@@ -172,6 +172,14 @@ The loop persists across restarts. Walk away mid-decision, come back, click appr
 
 ---
 
+## Dashboard UX
+
+- **Mobile-first responsive shell.** Sidebar collapses into a slide-in drawer on small screens with a backdrop overlay; a sticky topbar with hamburger sits above content. Auto-closes on route change.
+- **Voice input on the agent runner.** A mic button next to the prompt textarea uses the Web Speech API (Chrome/Safari) — speak the task, the transcript appends to the message field. Auto-hides on unsupported browsers (e.g. Firefox).
+- **Site footer.** Persistent footer across authed routes with navigation, social links, and `BuildWithShashank` branding.
+
+---
+
 ## Model independence
 
 ```yaml
@@ -316,6 +324,8 @@ Everything else — UI, skills, agents, memory — is in service of those three.
 
 <div align="center">
 
-**Built by [@shashankshekhar2909](https://github.com/shashankshekhar2909) · Licensed MIT (pending) · Issues + PRs welcome**
+**Built by [@shashankshekhar2909](https://github.com/shashankshekhar2909) · [BuildWithShashank](https://buildwithshashank.com) · Licensed MIT (pending) · Issues + PRs welcome**
+
+<sub>[X](https://x.com/shekharbuilds) · [GitHub](https://github.com/shashankshekhar2909) · [LinkedIn](https://linkedin.com/in/shashankshekhar2k15) · [Reddit](https://www.reddit.com/user/s_shekhar29/) · [Website](https://buildwithshashank.com/)</sub>
 
 </div>

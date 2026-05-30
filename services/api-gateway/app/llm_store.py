@@ -31,10 +31,10 @@ class LLMSettings:
 _cached = LLMSettings(
     litellm_master_key="",
     gemini_api_key="",
-    gemini_model="gemini-2.5-flash",
-    default_chat_model="gemini-2.5-flash",
+    gemini_model="gemini-flash",
+    default_chat_model="gemini-flash",
     default_embedding_model="embed-small",
-    default_agent_model="gemini-2.5-flash",
+    default_agent_model="gemini-flash",
 )
 
 
@@ -43,6 +43,15 @@ def _env(name: str, fallback: str) -> str:
 
     value = os.environ.get(name, "").strip()
     return value or fallback
+
+
+def _canonical_model_name(name: str) -> str:
+    value = name.strip()
+    aliases = {
+        "gemini-2.5-flash": "gemini-flash",
+        "gemini-2.5-pro": "gemini-pro",
+    }
+    return aliases.get(value, value)
 
 
 def current_llm_settings() -> LLMSettings:
@@ -58,11 +67,11 @@ def gemini_api_key() -> str:
 
 
 def gemini_model() -> str:
-    return _cached.gemini_model or _env("GEMINI_MODEL", "gemini-2.5-flash")
+    return _canonical_model_name(_cached.gemini_model or _env("GEMINI_MODEL", "gemini-flash"))
 
 
 def default_chat_model() -> str:
-    return _cached.default_chat_model or gemini_model()
+    return _canonical_model_name(_cached.default_chat_model or gemini_model())
 
 
 def default_embedding_model() -> str:
@@ -70,7 +79,7 @@ def default_embedding_model() -> str:
 
 
 def default_agent_model() -> str:
-    return _cached.default_agent_model or gemini_model()
+    return _canonical_model_name(_cached.default_agent_model or gemini_model())
 
 
 async def _get_setting(db: AsyncSession, name: str) -> str | None:
@@ -91,10 +100,10 @@ async def refresh_llm_settings(db: AsyncSession) -> LLMSettings:
 
     mk = await _get_setting(db, MASTER_KEY_NAME) or os.environ.get("LITELLM_MASTER_KEY", "sk-buildagent-master")
     gk = await _get_setting(db, GEMINI_API_KEY_NAME) or os.environ.get("GEMINI_API_KEY", "")
-    gm = await _get_setting(db, GEMINI_MODEL_NAME) or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-    chat = await _get_setting(db, DEFAULT_CHAT_MODEL_NAME) or gm
+    gm = _canonical_model_name(await _get_setting(db, GEMINI_MODEL_NAME) or os.environ.get("GEMINI_MODEL", "gemini-flash"))
+    chat = _canonical_model_name(await _get_setting(db, DEFAULT_CHAT_MODEL_NAME) or gm)
     emb = await _get_setting(db, DEFAULT_EMBEDDING_MODEL_NAME) or os.environ.get("EMBEDDING_MODEL", "embed-small")
-    agent = await _get_setting(db, DEFAULT_AGENT_MODEL_NAME) or gm
+    agent = _canonical_model_name(await _get_setting(db, DEFAULT_AGENT_MODEL_NAME) or gm)
     _cached = LLMSettings(
         litellm_master_key=mk.strip(),
         gemini_api_key=gk.strip(),

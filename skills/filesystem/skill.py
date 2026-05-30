@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from skill_sdk import Skill, SkillManifest
 
-ROOT = Path("/tmp/buildagent-files").resolve()
+ROOT = Path(os.getenv("BUILDAGENT_WORKSPACE_ROOT", "/home/shashank/project/buildOsAgent/.buildagent-files")).resolve()
+ROOT.mkdir(parents=True, exist_ok=True)
 
 
 def _safe_path(raw: str) -> Path:
@@ -15,11 +17,20 @@ def _safe_path(raw: str) -> Path:
 
 
 async def handle(payload: dict) -> dict:
-    op = payload.get("op")
+    op = str(payload.get("op") or payload.get("action") or "").strip().lower()
+    if op in {"ls", "dir"}:
+        op = "list"
+    elif op in {"cat", "show", "open"}:
+        op = "read"
+    elif not op:
+        if payload.get("content") is not None or payload.get("contents") is not None:
+            op = "write"
+        elif payload.get("recursive") is not None or payload.get("path") is not None:
+            op = "list"
 
     try:
         if op == "list":
-            path = _safe_path(str(payload.get("path", "")))
+            path = _safe_path(str(payload.get("path", ".")))
             if not path.exists():
                 return {"ok": False, "error": "path not found"}
             if path.is_file():
@@ -44,7 +55,7 @@ async def handle(payload: dict) -> dict:
 
         if op == "write":
             path = _safe_path(str(payload.get("path", "")))
-            content = str(payload.get("content", ""))
+            content = str(payload.get("content") if payload.get("content") is not None else payload.get("contents", ""))
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content)
             return {"ok": True, "path": str(path.relative_to(ROOT)), "bytes": len(content.encode())}
@@ -73,7 +84,7 @@ skill = Skill(
         manifest=SkillManifest(
             name="filesystem",
             version="1.0.0",
-            description="Safe path-restricted file operations under /tmp/buildagent-files.",
+            description=f"Safe path-restricted file operations under {ROOT}.",
             permissions=["fs:read", "fs:write"],
             requires_approval=True,
             risk="high",

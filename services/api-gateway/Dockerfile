@@ -8,7 +8,7 @@ WORKDIR /srv
 
 # Install build deps for bcrypt/cryptography wheels
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev curl \
+    build-essential libpq-dev curl docker.io \
     && rm -rf /var/lib/apt/lists/*
 
 COPY services/api-gateway/pyproject.toml ./pyproject.toml

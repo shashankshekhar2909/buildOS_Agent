@@ -120,12 +120,72 @@ class TaskOut(BaseModel):
     payload: dict
     state: TaskState
     node_id: UUID | None
+    agent_run_id: UUID | None = None
     scheduled_at: datetime | None
     started_at: datetime | None
     finished_at: datetime | None
     result: dict
     error: str | None
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ProjectIn(BaseModel):
+    name: str
+    project_type: str = "web"
+    stack: str = ""
+    brief: str = ""
+    features: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    repo_url: str | None = None
+    workspace_path: str | None = None
+    node_id: UUID | None = None
+    build_command: str | None = None
+    test_command: str | None = None
+    run_command: str | None = None
+    deploy_command: str | None = None
+    status: str = "draft"
+
+
+class ProjectUpdateIn(BaseModel):
+    name: str | None = None
+    project_type: str | None = None
+    stack: str | None = None
+    brief: str | None = None
+    features: list[str] | None = None
+    constraints: list[str] | None = None
+    repo_url: str | None = None
+    workspace_path: str | None = None
+    node_id: UUID | None = None
+    build_command: str | None = None
+    test_command: str | None = None
+    run_command: str | None = None
+    deploy_command: str | None = None
+    status: str | None = None
+
+
+class ProjectOut(BaseModel):
+    id: UUID
+    name: str
+    project_type: str
+    stack: str
+    brief: str
+    features: list[str]
+    constraints: list[str]
+    repo_url: str | None = None
+    workspace_path: str | None = None
+    node_id: UUID | None = None
+    build_command: str | None = None
+    test_command: str | None = None
+    run_command: str | None = None
+    deploy_command: str | None = None
+    status: str
+    last_task_id: UUID | None = None
+    created_by: UUID | None = None
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

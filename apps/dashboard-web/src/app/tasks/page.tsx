@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -123,6 +124,30 @@ export default function Tasks() {
         setPayloadText(JSON.stringify({ name: "slack", payload: { op: "history", limit: 20 } }, null, 2));
         setScheduledAt("");
         setRepeatEveryMinutes("5");
+        setRepeatUntil("");
+      },
+    },
+    {
+      id: "agent-build-app",
+      label: "Build app brief",
+      description: "Full markdown prompt for an agent task.",
+      apply: () => {
+        setTitle("Build app brief");
+        setKind("agent");
+        setCmd("");
+        setPayloadText(
+          [
+            "Goal: build a small app change.",
+            "",
+            "Do:",
+            "1. inspect the codebase",
+            "2. implement the change",
+            "3. run the relevant tests",
+            "4. summarize the diff",
+          ].join("\n")
+        );
+        setScheduledAt("");
+        setRepeatEveryMinutes("");
         setRepeatUntil("");
       },
     },
@@ -357,7 +382,11 @@ export default function Tasks() {
               <tbody className="divide-y divide-white/[0.04]">
                 {tasks.map((t) => (
                   <tr key={t.id} className="hover:bg-white/[0.01] transition-all duration-150">
-                    <td className="p-4 font-semibold text-slate-200">{t.title}</td>
+                    <td className="p-4 font-semibold text-slate-200">
+                      <Link href={`/tasks/${t.id}`} className="hover:text-white hover:underline">
+                        {t.title}
+                      </Link>
+                    </td>
                     <td className="p-4"><span className="text-xs font-mono text-slate-400">{t.kind}</span></td>
                     <td className="p-4"><RecurrencePill payload={t.payload} /></td>
                     <td className="p-4"><StatePill v={t.state} /></td>
@@ -392,6 +421,17 @@ function buildPayload(kind: string, cmd: string, payloadText: string): Record<st
   if (kind === "command") {
     return {
       cmd: cmd.split(/\s+/).filter(Boolean),
+    };
+  }
+  if (kind === "agent") {
+    const text = payloadText.trim();
+    if (!text) return { agent_name: "core", message: "" };
+    if (text.startsWith("{")) {
+      return parseJson(text);
+    }
+    return {
+      agent_name: "core",
+      message: text,
     };
   }
   return parseJson(payloadText);

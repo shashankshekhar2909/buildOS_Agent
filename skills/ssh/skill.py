@@ -77,6 +77,15 @@ def _prepare_known_hosts(known_hosts: str) -> tuple[str | None, str | None]:
     return tmp.name, tmp.name
 
 
+def _parse_stdout(stdout: str, parse_format: str) -> dict[str, Any]:
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    return {
+        "format": parse_format,
+        "count": len(lines),
+        "items": lines,
+    }
+
+
 async def handle(payload: dict) -> dict:
     op = str(payload.get("op") or "exec").strip().lower()
     if op not in {"exec", "run"}:
@@ -98,6 +107,10 @@ async def handle(payload: dict) -> dict:
     private_key_passphrase = _env_default(payload.get("private_key_passphrase"), "SSH_PRIVATE_KEY_PASSPHRASE")
     identity_file = _env_default(payload.get("identity_file"), "SSH_IDENTITY_FILE")
     known_hosts = _env_default(payload.get("known_hosts"), "SSH_KNOWN_HOSTS")
+    parse_output = bool(payload.get("parse_output"))
+    parse_format = str(payload.get("parse_format") or "lines").strip().lower()
+    if parse_format not in {"lines", "docker_names"}:
+        parse_format = "lines"
     strict_host_key_checking = str(
         payload.get("strict_host_key_checking", os.environ.get("SSH_STRICT_HOST_KEY_CHECKING", "yes"))
     ).strip().lower()
@@ -141,7 +154,7 @@ async def handle(payload: dict) -> dict:
             exit_code = stdout.channel.recv_exit_status()
             out = stdout.read().decode()
             err = stderr.read().decode()
-            return {
+            result: dict[str, Any] = {
                 "ok": exit_code == 0,
                 "exit_code": exit_code,
                 "stdout": out,
@@ -149,6 +162,9 @@ async def handle(payload: dict) -> dict:
                 "host": host,
                 "user": user,
             }
+            if parse_output:
+                result["parsed_stdout"] = _parse_stdout(out, parse_format)
+            return result
         finally:
             client.close()
             if temp_key:
@@ -191,6 +207,8 @@ skill = Skill(
             "private_key_passphrase": {"type": "string"},
             "known_hosts": {"type": "string"},
             "strict_host_key_checking": {"type": "string", "enum": ["yes", "no", "ask", "accept-new"]},
+            "parse_output": {"type": "boolean", "default": False},
+            "parse_format": {"type": "string", "enum": ["lines", "docker_names"], "default": "lines"},
             "connect_timeout": {"type": "integer", "default": 15},
             "timeout": {"type": "integer", "default": 60},
             "pty": {"type": "boolean", "default": False},

@@ -80,17 +80,17 @@ export default function SettingsPage() {
   const [providerDrafts, setProviderDrafts] = useState<Record<string, string>>({});
   const [llmMasterKey, setLlmMasterKey] = useState("");
   const [geminiApiKey, setGeminiApiKey] = useState("");
-  const [geminiModel, setGeminiModel] = useState("gemini-2.5-flash");
-  const [defaultChatModel, setDefaultChatModel] = useState("gemini-2.5-flash");
+  const [geminiModel, setGeminiModel] = useState("gemini-flash");
+  const [defaultChatModel, setDefaultChatModel] = useState("gemini-flash");
   const [defaultEmbeddingModel, setDefaultEmbeddingModel] = useState("embed-small");
-  const [defaultAgentModel, setDefaultAgentModel] = useState("gemini-2.5-flash");
+  const [defaultAgentModel, setDefaultAgentModel] = useState("gemini-flash");
 
   useEffect(() => {
     if (!llmSettingsQ.data) return;
-    setGeminiModel(llmSettingsQ.data.gemini_model.value || "gemini-2.5-flash");
-    setDefaultChatModel(llmSettingsQ.data.default_chat_model.value || "gemini-2.5-flash");
+    setGeminiModel(llmSettingsQ.data.gemini_model.value || "gemini-flash");
+    setDefaultChatModel(llmSettingsQ.data.default_chat_model.value || "gemini-flash");
     setDefaultEmbeddingModel(llmSettingsQ.data.default_embedding_model.value || "embed-small");
-    setDefaultAgentModel(llmSettingsQ.data.default_agent_model.value || "gemini-2.5-flash");
+    setDefaultAgentModel(llmSettingsQ.data.default_agent_model.value || "gemini-flash");
   }, [llmSettingsQ.data]);
 
   const saveProvider = useMutation({
@@ -154,7 +154,7 @@ export default function SettingsPage() {
       llmSettingsQ.data?.default_agent_model?.value,
       llmSettingsQ.data?.default_chat_model?.value,
       llmSettingsQ.data?.gemini_model?.value,
-      "gemini-2.5-flash",
+      "gemini-flash",
       "gpt-4o",
       "claude-sonnet",
       "groq-llama-8b",
@@ -217,9 +217,9 @@ export default function SettingsPage() {
 
       <section className="grid gap-4 md:grid-cols-4">
         <Metric label="Model pool" value={String(models.length)} />
-        <Metric label="Default chat" value={llmSettingsQ.data?.default_chat_model.value || "gemini-2.5-flash"} />
-        <Metric label="Default agent" value={llmSettingsQ.data?.default_agent_model.value || "gemini-2.5-flash"} />
-        <Metric label="Gemini route" value={llmSettingsQ.data?.gemini_model.value || "gemini-2.5-flash"} />
+        <Metric label="Default chat" value={llmSettingsQ.data?.default_chat_model.value || "gemini-flash"} />
+        <Metric label="Default agent" value={llmSettingsQ.data?.default_agent_model.value || "gemini-flash"} />
+        <Metric label="Gemini route" value={llmSettingsQ.data?.gemini_model.value || "gemini-flash"} />
       </section>
 
       <section className="rounded-2xl border border-border bg-panel overflow-hidden">
@@ -331,7 +331,8 @@ export default function SettingsPage() {
                       ))}
                     </div>
                 <Select value={geminiModel} onChange={(e) => setGeminiModel(e.target.value)} disabled={!canEditLlm}>
-                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                  <option value="gemini-flash">gemini-flash</option>
+                  <option value="gemini-pro">gemini-pro</option>
                   {Object.entries(modelGroups).map(([provider, ids]) => (
                     <optgroup key={provider} label={provider}>
                       {ids.map((id) => (
@@ -370,7 +371,8 @@ export default function SettingsPage() {
                       ))}
                     </div>
                 <Select value={defaultChatModel} onChange={(e) => setDefaultChatModel(e.target.value)} disabled={!canEditLlm}>
-                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                  <option value="gemini-flash">gemini-flash</option>
+                  <option value="gemini-pro">gemini-pro</option>
                   <option value="gpt-4o">gpt-4o</option>
                   <option value="claude-sonnet">claude-sonnet</option>
                   <option value="groq-llama-8b">groq-llama-8b</option>
@@ -412,7 +414,8 @@ export default function SettingsPage() {
                       ))}
                     </div>
                 <Select value={defaultAgentModel} onChange={(e) => setDefaultAgentModel(e.target.value)} disabled={!canEditLlm}>
-                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                  <option value="gemini-flash">gemini-flash</option>
+                  <option value="gemini-pro">gemini-pro</option>
                   <option value="gpt-4o">gpt-4o</option>
                   <option value="claude-sonnet">claude-sonnet</option>
                   <option value="groq-llama-8b">groq-llama-8b</option>
@@ -443,10 +446,10 @@ export default function SettingsPage() {
               onClick={() => {
                 setLlmMasterKey("");
                 setGeminiApiKey("");
-                setGeminiModel("gemini-2.5-flash");
-                setDefaultChatModel("gemini-2.5-flash");
+                setGeminiModel("gemini-flash");
+                setDefaultChatModel("gemini-flash");
                 setDefaultEmbeddingModel("embed-small");
-                setDefaultAgentModel("gemini-2.5-flash");
+                setDefaultAgentModel("gemini-flash");
               }}
             >
               Reset draft

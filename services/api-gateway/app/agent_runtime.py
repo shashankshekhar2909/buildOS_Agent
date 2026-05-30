@@ -59,11 +59,117 @@ def _gemini_client() -> genai.Client:
     return genai.Client(api_key=key)
 
 
+def _schema_is_object(schema: dict) -> bool:
+    schema_type = str(schema.get("type") or "").lower()
+    return schema_type == "object" or "properties" in schema
+
+
+def _normalize_skill_schema(raw_schema: Any) -> dict:
+    """Return an OpenAI/Gemini-friendly JSON schema object.
+
+    Skill manifests may define either a full JSON schema object or a flat
+    field map. Gemini rejects the flat map, so we always normalize to:
+    {type: object, properties: {...}, required: [...]}
+    """
+    schema = raw_schema if isinstance(raw_schema, dict) else {}
+    if not schema:
+        return {"type": "object", "properties": {}}
+
+    schema_keywords = {
+        "type",
+        "properties",
+        "items",
+        "required",
+        "enum",
+        "description",
+        "title",
+        "default",
+        "format",
+        "nullable",
+        "additionalProperties",
+        "anyOf",
+        "allOf",
+        "oneOf",
+        "minItems",
+        "maxItems",
+        "minLength",
+        "maxLength",
+        "minimum",
+        "maximum",
+        "$ref",
+        "ref",
+    }
+
+    looks_like_schema = any(key in schema for key in schema_keywords)
+    if not looks_like_schema and not _schema_is_object(schema):
+        schema = {"type": "object", "properties": schema}
+
+    out: dict[str, Any] = {}
+    schema_type = str(schema.get("type") or "object").lower()
+    out["type"] = schema_type
+
+    if "description" in schema and schema["description"] is not None:
+        out["description"] = schema["description"]
+    if "title" in schema and schema["title"] is not None:
+        out["title"] = schema["title"]
+    if "enum" in schema and schema["enum"] is not None:
+        out["enum"] = list(schema["enum"])
+    if "default" in schema and schema["default"] is not None:
+        out["default"] = schema["default"]
+    if "format" in schema and schema["format"] is not None:
+        out["format"] = schema["format"]
+    if "nullable" in schema and schema["nullable"] is not None:
+        out["nullable"] = bool(schema["nullable"])
+    if "required" in schema and schema["required"] is not None:
+        out["required"] = list(schema["required"])
+    if "propertyOrdering" in schema and schema["propertyOrdering"] is not None:
+        out["propertyOrdering"] = list(schema["propertyOrdering"])
+
+    properties = schema.get("properties") or {}
+    if isinstance(properties, dict):
+        out["properties"] = {key: _normalize_skill_schema(value) for key, value in properties.items()}
+    else:
+        out["properties"] = {}
+
+    items = schema.get("items")
+    if items is not None:
+        out["items"] = _normalize_skill_schema(items)
+
+    additional_properties = schema.get("additionalProperties")
+    if additional_properties is not None:
+        if isinstance(additional_properties, dict):
+            out["additionalProperties"] = _normalize_skill_schema(additional_properties)
+        else:
+            out["additionalProperties"] = bool(additional_properties)
+
+    any_of = schema.get("anyOf")
+    if isinstance(any_of, list):
+        out["anyOf"] = [_normalize_skill_schema(item) for item in any_of]
+
+    ref = schema.get("$ref") or schema.get("ref")
+    if ref is not None:
+        out["$ref"] = ref
+
+    schema_type_map = {
+        "string": "string",
+        "number": "number",
+        "integer": "integer",
+        "boolean": "boolean",
+        "array": "array",
+        "object": "object",
+        "null": "null",
+    }
+    if schema_type in schema_type_map:
+        out["type"] = schema_type_map[schema_type]
+
+    return out
+
+
 def _skill_to_tool_schema(name: str) -> dict:
     skill = skill_registry().get(name)
     if not skill:
         return {}
-    schema = getattr(skill.manifest, "schema", None) or {"type": "object", "properties": {}}
+    schema = _normalize_skill_schema(getattr(skill.manifest, "schema", None))
     return {
         "type": "function",
         "function": {
@@ -89,15 +195,110 @@ def _build_gemini_tools(skill_names: list[str]) -> list[types.Tool]:
         skill = skill_registry().get(name)
         if not skill:
             continue
-        schema = getattr(skill.manifest, "schema", None) or {"type": "object", "properties": {}}
+        schema = _normalize_skill_schema(getattr(skill.manifest, "schema", None))
         decls.append(
             types.FunctionDeclaration(
                 name=f"skill_{name}",
                 description=getattr(skill.manifest, "description", "") or name,
-                parameters=schema,
+                parametersJsonSchema=schema,
             )
         )
     return [types.Tool(function_declarations=decls)] if decls else []
+
+
+def _is_readonly_tool_call(skill_name: str, args: dict[str, Any]) -> bool:
+    op = str(args.get("op") or args.get("action") or "").strip().lower()
+    if skill_name in {"gmail", "calendar"}:
+        return True
+    if skill_name == "filesystem":
+        return True
+    if skill_name == "proxmox":
+        return op in {"nodes", "vms", "status", "vm_status", "tasks"}
+    if skill_name == "docker":
+        return op in {"ps", "logs"}
+    return False
+
+
+def _normalize_tool_arguments(skill_name: str, args: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(args or {})
+    if skill_name == "docker":
+        op = str(normalized.get("op") or "").strip().lower()
+        command = str(normalized.get("command") or normalized.get("cmd") or "").strip().lower()
+        name = str(normalized.get("name") or "").strip()
+        action = str(normalized.get("action") or "").strip().lower()
+        if not op and command:
+            if command in {"info", "help", "list", "status", "show", "count"}:
+                normalized = {"op": "ps"}
+            elif "docker ps" in command or command.startswith("ps"):
+                normalized = {"op": "ps"}
+            elif "docker logs" in command and name:
+                normalized = {"op": "logs", "name": name}
+            elif "docker stop" in command and name:
+                normalized = {"op": "stop", "name": name}
+            elif "docker restart" in command and name:
+                normalized = {"op": "restart", "name": name}
+        if not op and (action in {"help", "list", "status", "inspect", "show", "count"} or "all" in normalized):
+            normalized = {"op": "ps"}
+    return normalized
+
+
+def _normalize_tool_name(tool_name: str, allowed_skills: list[str]) -> str:
+    name = str(tool_name or "").strip()
+    if not name:
+        return ""
+    if name.startswith("skill_"):
+        return name
+    if name in allowed_skills:
+        return f"skill_{name}"
+    return name
+
+
+def _tool_protocol_prompt(base_prompt: str, allowed_skills: list[str]) -> str:
+    tool_lines = "\n".join(f"- {name} (or skill_{name})" for name in allowed_skills)
+    return (
+        f"{base_prompt}\n\n"
+        "You can use tools. When you need one, reply with ONLY valid JSON, no markdown.\n"
+        'Tool action format: {"type":"tool","tool":"docker","arguments":{...}}\n'
+        'Or: {"type":"tool","tool":"skill_docker","arguments":{...}}\n'
+        'Final answer format: {"type":"final","output":"..."}\n'
+        "Available tools:\n"
+        f"{tool_lines}\n"
+        "If you need to inspect something, use a tool. If the task is done, return final."
+    )
+
+
+def _parse_text_action(text: str) -> dict[str, Any] | None:
+    raw = text.strip()
+    if not raw:
+        return None
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        raw = raw.removeprefix("json").strip()
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        raw = raw[start : end + 1]
+    try:
+        obj = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(obj, dict):
+        return None
+    kind = str(obj.get("type") or "").strip().lower()
+    if kind not in {"tool", "final"}:
+        if "tool" in obj:
+            kind = "tool"
+        elif "output" in obj:
+            kind = "final"
+        else:
+            return None
+    if kind == "tool":
+        return {
+            "type": "tool",
+            "tool": str(obj.get("tool") or obj.get("name") or "").strip(),
+            "arguments": obj.get("arguments") if isinstance(obj.get("arguments"), dict) else (obj.get("payload") if isinstance(obj.get("payload"), dict) else {}),
+        }
+    return {"type": "final", "output": str(obj.get("output") or obj.get("text") or "").strip()}
 
 
 def _uses_gemini(model: str) -> bool:
@@ -166,7 +367,7 @@ def _gemini_response_to_output(resp) -> tuple[str, types.Content | None, list[tu
 
 AGENT_PRESETS: dict[str, dict] = {
     "core": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-flash",
         "system_prompt": (
             "You are BuildAgent Core. Orchestrate work using available skill tools. "
             "Prefer the smallest tool that solves the task. Dangerous tools require "
@@ -175,27 +376,27 @@ AGENT_PRESETS: dict[str, dict] = {
         "skills": None,  # None = all available
     },
     "infra": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-flash",
         "system_prompt": "You manage docker, ssh, proxmox, filesystem. Inspect before mutating.",
         "skills": ["docker", "ssh", "proxmox", "filesystem"],
     },
     "mail": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-flash",
         "system_prompt": "You triage inbox, draft replies, schedule events. Never send without approval.",
         "skills": ["gmail", "calendar"],
     },
     "messenger": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-flash",
         "system_prompt": "You send messages on slack/telegram/whatsapp. Confirm recipient before sending.",
         "skills": ["slack", "telegram", "whatsapp"],
     },
     "notes": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-flash",
         "system_prompt": "You organize knowledge, summarize, manage notes.",
         "skills": ["notes"],
     },
     "dev": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-flash",
         "system_prompt": "You manage repos, CI/CD, code. Show diffs before applying.",
         "skills": ["filesystem", "ssh", "docker"],
     },
@@ -282,21 +483,24 @@ async def _drive_loop_gemini(
 
             requires_approval = bool(getattr(skill.manifest, "requires_approval", False))
             if requires_approval:
-                if approval_resolver is None:
+                if _is_readonly_tool_call(skill_name, args):
+                    pass
+                elif approval_resolver is None:
                     return RunResult(
                         output=text,
                         steps=trace,
                         stop_reason="approval_required",
                         pending_tool={"tool": tool_name, "skill": skill_name, "arguments": args, "tool_call_id": tool_name},
                     )
-                approved = await approval_resolver(skill_name, args)
-                if not approved:
-                    result = {"ok": False, "error": "approval denied"}
-                    trace.append(StepTrace(tool=tool_name, arguments=args, result=None, error="approval denied"))
-                    fr = types.Part.from_function_response(name=tool_name, response=result)
-                    contents.append(types.Content(role="user", parts=[fr]))
-                    messages.append({"role": "tool", "tool_call_id": tool_name, "name": tool_name, "content": json.dumps(result)})
-                    continue
+                else:
+                    approved = await approval_resolver(skill_name, args)
+                    if not approved:
+                        result = {"ok": False, "error": "approval denied"}
+                        trace.append(StepTrace(tool=tool_name, arguments=args, result=None, error="approval denied"))
+                        fr = types.Part.from_function_response(name=tool_name, response=result)
+                        contents.append(types.Content(role="user", parts=[fr]))
+                        messages.append({"role": "tool", "tool_call_id": tool_name, "name": tool_name, "content": json.dumps(result)})
+                        continue
 
             result = await _invoke_skill(skill_name, args)
             trace.append(StepTrace(tool=tool_name, arguments=args, result=result))
@@ -334,14 +538,89 @@ async def drive_loop(
     """Drive the LLM tool-loop from an existing message array. Used for both
     fresh runs and resume-after-approval. Mutates `messages` in place."""
     trace = trace if trace is not None else []
-    if _uses_gemini(model):
-        return await _drive_loop_gemini(messages, allowed_skills, model=model, max_steps=max_steps, trace=trace, approval_resolver=approval_resolver)
-
-    tools = _build_tools(allowed_skills)
     client = _llm_client()
+
+    if _uses_gemini(model):
+        prompt_messages = list(messages)
+        if prompt_messages and prompt_messages[0].get("role") == "system":
+            prompt_messages[0] = {
+                "role": "system",
+                "content": _tool_protocol_prompt(str(prompt_messages[0].get("content") or ""), allowed_skills),
+            }
+        else:
+            prompt_messages.insert(
+                0,
+                {
+                    "role": "system",
+                    "content": _tool_protocol_prompt("", allowed_skills),
+                },
+            )
+
+        for _ in range(max_steps):
+            resp = await client.chat.completions.create(model=model, messages=prompt_messages)
+            msg = resp.choices[0].message
+            content = msg.content or ""
+            action = _parse_text_action(content)
+            if not action or action.get("type") == "final":
+                final_output = (action or {}).get("output") if action else content
+                messages.append({"role": "assistant", "content": content})
+                return RunResult(output=str(final_output or content), steps=trace, stop_reason="completed")
+
+            tool_name = _normalize_tool_name(str(action.get("tool") or "").strip(), allowed_skills)
+            args = action.get("arguments") if isinstance(action.get("arguments"), dict) else {}
+            if not tool_name.startswith("skill_"):
+                result = {"ok": False, "error": f"unknown tool {tool_name}"}
+                trace.append(StepTrace(tool=tool_name or "unknown", arguments=args, result=None, error="unknown tool"))
+                prompt_messages.append({"role": "assistant", "content": content})
+                prompt_messages.append({"role": "user", "content": f"TOOL_RESULT {tool_name}: {json.dumps(result)}"})
+                messages.append({"role": "assistant", "content": content})
+                messages.append({"role": "user", "content": f"TOOL_RESULT {tool_name}: {json.dumps(result)}"})
+                continue
+
+            skill_name = tool_name[len("skill_"):]
+            skill = skill_registry().get(skill_name)
+            if skill is None:
+                result = {"ok": False, "error": f"skill {skill_name} not loaded"}
+                trace.append(StepTrace(tool=tool_name, arguments=args, result=None, error="skill missing"))
+                prompt_messages.append({"role": "assistant", "content": content})
+                prompt_messages.append({"role": "user", "content": f"TOOL_RESULT {tool_name}: {json.dumps(result)}"})
+                messages.append({"role": "assistant", "content": content})
+                messages.append({"role": "user", "content": f"TOOL_RESULT {tool_name}: {json.dumps(result)}"})
+                continue
+
+            args = _normalize_tool_arguments(skill_name, args)
+
+            requires_approval = bool(getattr(skill.manifest, "requires_approval", False))
+            if requires_approval and not _is_readonly_tool_call(skill_name, args):
+                if approval_resolver is None:
+                    return RunResult(
+                        output=content,
+                        steps=trace,
+                        stop_reason="approval_required",
+                        pending_tool={"tool": tool_name, "skill": skill_name, "arguments": args, "tool_call_id": tool_name},
+                    )
+                approved = await approval_resolver(skill_name, args)
+                if not approved:
+                    result = {"ok": False, "error": "approval denied"}
+                    trace.append(StepTrace(tool=tool_name, arguments=args, result=None, error="approval denied"))
+                    prompt_messages.append({"role": "assistant", "content": content})
+                    prompt_messages.append({"role": "user", "content": f"TOOL_RESULT {tool_name}: {json.dumps(result)}"})
+                    messages.append({"role": "assistant", "content": content})
+                    messages.append({"role": "user", "content": f"TOOL_RESULT {tool_name}: {json.dumps(result)}"})
+                    continue
+
+            result = await _invoke_skill(skill_name, args)
+            trace.append(StepTrace(tool=tool_name, arguments=args, result=result))
+            prompt_messages.append({"role": "assistant", "content": content})
+            prompt_messages.append({"role": "user", "content": f"TOOL_RESULT {tool_name}: {json.dumps(result, default=str)}"})
+            messages.append({"role": "assistant", "content": content})
+            messages.append({"role": "user", "content": f"TOOL_RESULT {tool_name}: {json.dumps(result, default=str)}"})
+
+        return RunResult(output="", steps=trace, stop_reason="max_steps")
 
     for _ in range(max_steps):
         kwargs: dict[str, Any] = {"model": model, "messages": messages}
+        tools = _build_tools(allowed_skills)
         if tools:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
@@ -384,21 +663,26 @@ async def drive_loop(
                 messages.append({"role": "tool", "tool_call_id": tc.id, "name": tname, "content": json.dumps(result)})
                 continue
 
+            args = _normalize_tool_arguments(skill_name, args)
+
             requires_approval = bool(getattr(skill.manifest, "requires_approval", False))
             if requires_approval:
-                if approval_resolver is None:
+                if _is_readonly_tool_call(skill_name, args):
+                    pass
+                elif approval_resolver is None:
                     return RunResult(
                         output=msg.content or "",
                         steps=trace,
                         stop_reason="approval_required",
                         pending_tool={"tool": tname, "skill": skill_name, "arguments": args, "tool_call_id": tc.id},
                     )
-                approved = await approval_resolver(skill_name, args)
-                if not approved:
-                    result = {"ok": False, "error": "approval denied"}
-                    trace.append(StepTrace(tool=tname, arguments=args, result=None, error="approval denied"))
-                    messages.append({"role": "tool", "tool_call_id": tc.id, "name": tname, "content": json.dumps(result)})
-                    continue
+                else:
+                    approved = await approval_resolver(skill_name, args)
+                    if not approved:
+                        result = {"ok": False, "error": "approval denied"}
+                        trace.append(StepTrace(tool=tname, arguments=args, result=None, error="approval denied"))
+                        messages.append({"role": "tool", "tool_call_id": tc.id, "name": tname, "content": json.dumps(result)})
+                        continue
 
             result = await _invoke_skill(skill_name, args)
             trace.append(StepTrace(tool=tname, arguments=args, result=result))
