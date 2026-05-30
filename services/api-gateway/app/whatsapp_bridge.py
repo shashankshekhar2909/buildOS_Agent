@@ -12,10 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent_runtime import StepTrace, drive_loop, resolve_skills
+from app.chat_store import record_chat_message
 from app.config import get_settings
 from app.db import SessionLocal
 from app.llm_store import default_agent_model
-from app.models import AgentRun, AgentRunState, Approval, Secret, Task, TaskState
+from app.models import AgentRun, AgentRunState, Approval, Secret, Task, TaskState, WhatsAppMessage
 from app.crypto import decrypt
 
 
@@ -79,6 +80,55 @@ def _send_whatsapp_sync(access_token: str, version: str, phone_number_id: str, r
     with urllib.request.urlopen(req, timeout=30) as res:
         raw = res.read().decode("utf-8")
     return json.loads(raw) if raw else {}
+
+
+async def record_whatsapp_message(
+    db: AsyncSession,
+    *,
+    owner_id: UUID,
+    phone_number_id: str,
+    remote_id: str,
+    direction: str,
+    text: str,
+    message_id: str | None = None,
+    task_id: UUID | None = None,
+    agent_run_id: UUID | None = None,
+) -> WhatsAppMessage:
+    row = WhatsAppMessage(
+        owner_id=owner_id,
+        phone_number_id=phone_number_id,
+        remote_id=remote_id,
+        direction=direction,
+        text=text,
+        message_id=message_id,
+        task_id=task_id,
+        agent_run_id=agent_run_id,
+    )
+    db.add(row)
+    await db.flush()
+    return row
+
+
+async def record_whatsapp_chat(
+    db: AsyncSession,
+    *,
+    owner_id: UUID,
+    role: str,
+    content: str,
+    agent_name: str,
+    model: str,
+    run_id: UUID | None = None,
+) -> None:
+    await record_chat_message(
+        db,
+        owner_id=owner_id,
+        role=role,
+        content=content,
+        agent_name=agent_name,
+        model=model,
+        source="whatsapp",
+        run_id=run_id,
+    )
 
 
 async def send_whatsapp_message(access_token: str, version: str, phone_number_id: str, recipient: str, message: str) -> dict[str, Any]:
@@ -235,6 +285,24 @@ async def process_whatsapp_webhook(payload: dict[str, Any]) -> list[dict[str, An
                 results.append({"ok": False, "error": "no whatsapp connector matched"})
                 continue
 
+            await record_whatsapp_message(
+                db,
+                owner_id=owner_id,
+                phone_number_id=phone_number_id,
+                remote_id=from_id,
+                direction="incoming",
+                text=text,
+                message_id=event.get("message_id"),
+            )
+            await record_whatsapp_chat(
+                db,
+                owner_id=owner_id,
+                role="user",
+                content=text,
+                agent_name=str(secret.get("default_agent") or "core"),
+                model=str(secret.get("default_model") or default_agent_model()),
+            )
+
             task = Task(
                 title=f"WhatsApp: {text[:48]}",
                 kind="agent",
@@ -273,6 +341,24 @@ async def process_whatsapp_webhook(payload: dict[str, Any]) -> list[dict[str, An
                     str(secret.get("phone_number_id") or ""),
                     from_id,
                     reply,
+                )
+                await record_whatsapp_message(
+                    db,
+                    owner_id=owner_id,
+                    phone_number_id=phone_number_id,
+                    remote_id=from_id,
+                    direction="outgoing",
+                    text=reply,
+                    task_id=task.id,
+                )
+                await record_whatsapp_chat(
+                    db,
+                    owner_id=owner_id,
+                    role="assistant",
+                    content=reply,
+                    agent_name=str(secret.get("default_agent") or "core"),
+                    model=str(secret.get("default_model") or default_agent_model()),
+                    run_id=task.agent_run_id,
                 )
 
             results.append({"ok": True, "task_id": str(task.id), "state": task.state.value})

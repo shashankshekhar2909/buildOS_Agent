@@ -14,6 +14,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] root `package.json` + `pnpm-workspace.yaml` — 2026-05-23
 - [x] `.gitignore` — 2026-05-23
 - [x] `.env.example` (incl. host port map + JWT + service tokens) — 2026-05-23
+- [x] `CLAUDE.md` agent instructions — 2026-05-31
 - [x] `README.md` — 2026-05-23
 - [x] `PLAN.md` + `CHECKLIST.md` — 2026-05-23
 - [x] root `Makefile` — 2026-05-23

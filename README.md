@@ -25,6 +25,8 @@ BuildAgent is what happens when you stop renting your AI assistant from someone 
 
 It runs on your hardware. It connects to your tools. It executes real commands — but only after you say yes. It talks to OpenAI, Anthropic, Google, Groq, or your local Ollama box; swap providers from a dropdown. It remembers things (P5: pgvector). It distributes work across registered nodes. It refuses to send the email until you click approve.
 
+Agent instructions live in [CLAUDE.md](/home/shashank/project/buildOsAgent/CLAUDE.md). Visual rules live in [docs/ui-guidelines.md](/home/shashank/project/buildOsAgent/docs/ui-guidelines.md). Update both when the UI or workflow direction changes.
+
 ```
                     you ──► dashboard ──► api-gateway ──► agent loop
                                               │              │

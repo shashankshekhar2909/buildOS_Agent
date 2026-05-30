@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { HelpBanner } from "@/components/help-banner";
@@ -30,10 +31,14 @@ export default function Approvals() {
   const decide = useMutation({
     mutationFn: ({ id, approve }: { id: string; approve: boolean }) =>
       api(`/v1/approvals/${id}/decide`, { method: "POST", body: JSON.stringify({ approve }) }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ["approvals"] });
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["agent-runs"] });
+      toast.success(variables.approve ? "Approved" : "Denied");
+    },
+    onError: (e: unknown) => {
+      toast.error("Decision failed", { description: e instanceof Error ? e.message.slice(0, 120) : undefined });
     },
   });
 

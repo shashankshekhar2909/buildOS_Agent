@@ -1,15 +1,34 @@
 "use client";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Toaster } from "sonner";
 import { WS_URL } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { CommandPalette } from "@/components/command-palette";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [qc] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 5_000 } } }));
   return (
     <QueryClientProvider client={qc}>
-      <WSBridge />
-      {children}
+      <TooltipProvider delayDuration={250}>
+        <WSBridge />
+        <CommandPalette />
+        {children}
+        <Toaster
+          theme="dark"
+          position="bottom-right"
+          toastOptions={{
+            classNames: {
+              toast:
+                "!bg-popover/95 !text-slate-100 !border !border-white/[0.06] !backdrop-blur-xl !rounded-xl !shadow-2xl",
+              description: "!text-slate-400",
+              actionButton: "!bg-accent !text-white",
+              cancelButton: "!bg-white/[0.05] !text-slate-300",
+            },
+          }}
+        />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

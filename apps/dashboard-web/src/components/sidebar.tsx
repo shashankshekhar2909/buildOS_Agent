@@ -17,6 +17,7 @@ const items = [
   { href: "/agents", label: "Agents", icon: Workflow },
   { href: "/agent-runs", label: "Runs", icon: History },
   { href: "/skills", label: "Skills", icon: Wrench },
+  { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/tasks", label: "Tasks", icon: Box },
   { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "operator"] },

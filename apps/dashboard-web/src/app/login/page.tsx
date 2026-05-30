@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LogoMark } from "@/components/brand/logo";
+import { toast } from "sonner";
 
 export default function Login() {
   const router = useRouter();
@@ -31,9 +32,12 @@ export default function Login() {
       if (!res.ok) throw new Error(await res.text());
       const { access_token, refresh_token } = await res.json();
       setTokens(access_token, refresh_token);
+      toast.success("Signed in");
       router.push("/");
     } catch (e: any) {
-      setErr(e.message);
+      const msg = e?.message || "Sign in failed";
+      setErr(msg);
+      toast.error("Sign in failed", { description: msg.slice(0, 120) });
     }
   }
 

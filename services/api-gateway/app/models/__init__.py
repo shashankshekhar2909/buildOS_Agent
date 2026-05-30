@@ -13,6 +13,8 @@ from app.models.skill import Skill
 from app.models.skill_preset import SkillPreset
 from app.models.secret import Secret
 from app.models.grant import SkillGrant
+from app.models.whatsapp_message import WhatsAppMessage
+from app.models.chat_message import ChatMessage
 
 __all__ = [
     "User",
@@ -33,4 +35,6 @@ __all__ = [
     "SkillPreset",
     "Secret",
     "SkillGrant",
+    "WhatsAppMessage",
+    "ChatMessage",
 ]

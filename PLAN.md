@@ -2,6 +2,8 @@
 
 Living document. Source of truth for what we're building, why, and current state.
 Update at the end of every working session. Pair with `CHECKLIST.md`.
+Pair with `CLAUDE.md` for agent behavior and UI direction.
+Use `docs/ui-guidelines.md` for the visual system.
 
 ---
 
@@ -52,10 +54,12 @@ User can:
 - **P4** Skills: docker, gmail, calendar, notes
 - **P5** Memory + AI routing
 - **P6** Mobile + Desktop
+- **P7** UI refinement: shadcn primitives (dialog/sheet/dropdown/tooltip/tabs/skeleton/command), HSL design tokens, DataTable + PageHeader + EmptyState shared, sonner toasts, ⌘K palette
 
 ## Current Session Focus
 
 Greenfield scaffold all of P1 + P2 skeletons + P3-P6 placeholders.
+Keep `CLAUDE.md` in sync when UI/design rules change.
 
 ## Open Questions / Deferred
 

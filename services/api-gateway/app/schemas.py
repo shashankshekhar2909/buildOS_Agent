@@ -252,3 +252,64 @@ class SkillUpdateIn(BaseModel):
 
 class SkillRunIn(BaseModel):
     payload: dict = Field(default_factory=dict)
+
+
+class WhatsAppMessageOut(BaseModel):
+    id: UUID
+    owner_id: UUID
+    phone_number_id: str
+    remote_id: str
+    direction: str
+    message_id: str | None = None
+    text: str
+    task_id: UUID | None = None
+    agent_run_id: UUID | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class WhatsAppThreadOut(BaseModel):
+    remote_id: str
+    phone_number_id: str
+    last_message: str
+    last_message_at: datetime
+    message_count: int
+    unread_count: int = 0
+
+
+class WhatsAppSendIn(BaseModel):
+    message: str = Field(min_length=1)
+
+
+class ChatMessageOut(BaseModel):
+    id: UUID
+    owner_id: UUID
+    role: str
+    content: str
+    agent_name: str
+    model: str
+    source: str
+    run_id: UUID | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChatSendIn(BaseModel):
+    message: str = Field(min_length=1)
+    agent_name: str = "core"
+    model: str | None = None
+    max_steps: int = Field(default=6, ge=1, le=20)
+    skill_overrides: list[str] | None = None
+
+
+class ChatSendOut(BaseModel):
+    state: str
+    output: str | None = None
+    pending_tool: dict | None = None
+    steps: list[dict] = Field(default_factory=list)
+    user_message: ChatMessageOut | None = None
+    assistant_message: ChatMessageOut | None = None

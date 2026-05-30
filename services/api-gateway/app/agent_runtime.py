@@ -27,6 +27,14 @@ class StepTrace:
     result: Any
     error: str | None = None
 
+    def model_dump(self) -> dict:
+        return {
+            "tool": self.tool,
+            "arguments": self.arguments,
+            "result": self.result,
+            "error": self.error,
+        }
+
 
 @dataclass
 class RunResult:

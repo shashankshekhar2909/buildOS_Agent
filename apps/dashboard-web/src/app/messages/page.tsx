@@ -179,11 +179,11 @@ export default function MessagesPage() {
         description="Register Telegram and Slack once per user. Skills can then send or inspect messages without sharing tokens across accounts."
         bullets={[
           "Each user gets their own server-side connector record.",
-          "WhatsApp stays on the skill page for now.",
-          "Use Skills for execution, Messages for registration.",
+          "Open Chat for the in-app chatbot.",
+          "Use Messages for registration, Chat for conversation.",
         ]}
-        href="/skills/telegram"
-        hrefLabel="Open Telegram skill"
+        href="/chat"
+        hrefLabel="Open chat"
       />
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -335,12 +335,12 @@ export default function MessagesPage() {
       <Card className="border-white/10 bg-slate-950/70">
         <CardHeader>
           <CardTitle className="text-white">Other messaging</CardTitle>
-          <CardDescription>WhatsApp stays available on the WhatsApp skill page for now.</CardDescription>
+          <CardDescription>Use Chat if you want the assistant inside the app. Use WhatsApp only if you want external messaging.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-3">
           <Badge variant="secondary">WhatsApp Cloud API</Badge>
-          <Link href="/skills/whatsapp" className="rounded border border-border bg-bg px-3 py-2 text-sm text-white">
-            Open WhatsApp skill
+          <Link href="/chat" className="rounded border border-border bg-bg px-3 py-2 text-sm text-white">
+            Open chat
           </Link>
         </CardContent>
       </Card>
